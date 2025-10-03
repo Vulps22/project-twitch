@@ -57,11 +57,22 @@ jspm_packages/
 # Yarn Integrity file
 .yarn-integrity
 
-# dotenv environment variables file
+# dotenv environment variables file - NEVER COMMIT THESE!
 .env
+.env.*
 .env.test
 .env.production
 .env.local
+.env.development
+.env.staging
+backend/.env
+backend/.env.*
+
+# SENSITIVE FILES - STREAMING PROTECTION
+**/.env
+**/.env.*
+**/secrets.*
+**/credentials.*
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
@@ -169,11 +180,17 @@ ehthumbs.db
 Thumbs.db
 
 # IDE files
-.vscode/
+.vscode/settings.json
+.vscode/launch.json
+.vscode/tasks.json
 .idea/
 *.swp
 *.swo
 *~
+
+# Keep .vscode/settings.json for streaming protection but ignore other configs
+!.vscode/
+!.vscode/settings.json
 
 # Logs
 logs
