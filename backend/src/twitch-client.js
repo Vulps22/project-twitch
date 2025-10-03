@@ -3,6 +3,8 @@
 
 import WebSocket from 'ws';
 import fetch from 'node-fetch';
+import TwitchCommandHandler from './handlers/TwitchCommandHandler.js';
+import Logger from './utils/Logger.js';
 
 export class TwitchClient {
     constructor(options = {}) {
@@ -14,6 +16,7 @@ export class TwitchClient {
         this.username = null;
         this.channelId = null;
         this.channelName = options.channelName || process.env.TWITCH_CHANNEL_NAME;
+        this.overlayBroadcaster = options.overlayBroadcaster || null;
         this.commandHandler = null;
         this.eventHandler = null;
         
@@ -25,11 +28,11 @@ export class TwitchClient {
     }
 
     async init() {
-        console.log('EventSub: Initializing Twitch EventSub WebSocket...');
+        Logger.info('EventSub: Initializing Twitch EventSub WebSocket...');
         
-        // Initialize handlers (you'll need to implement or import these)
-        // this.commandHandler = new TwitchCommandHandler();
-        // this.eventHandler = new TwitchEventHandler();
+        // Initialize handlers with dependency injection
+        this.commandHandler = new TwitchCommandHandler(this, this.overlayBroadcaster);
+        // this.eventHandler = new TwitchEventHandler(); // TODO: Create this handler
 
         // Get user ID from Twitch API (bot account)
         await this.getUserId();
@@ -78,13 +81,13 @@ export class TwitchClient {
                 const data = await response.json();
                 this.userId = data.data[0].id;
                 this.username = data.data[0].display_name;
-                console.log('EventSub: Got user ID:', this.userId);
-                console.log('EventSub: Connected as:', this.username);
+                Logger.info('EventSub: Got user ID:', { user_id: this.userId });
+                Logger.info('EventSub: Connected as:', this.username);
             } else {
-                console.error('EventSub: Failed to get user ID:', response.statusText);
+                Logger.error('EventSub: Failed to get user ID:', response.statusText);
             }
         } catch (error) {
-            console.error('EventSub: Error getting user ID:', error);
+            Logger.error('EventSub: Error getting user ID:', error);
         }
     }
 
@@ -101,9 +104,9 @@ export class TwitchClient {
                 const data = await response.json();
                 if (data.data.length > 0) {
                     this.channelId = data.data[0].id;
-                    console.log('EventSub: Got channel ID for', this.channelName + ':', this.channelId);
+                    Logger.info('EventSub: Got channel ID for', this.channelName + ':', { channel_id: this.channelId });
                 } else {
-                    console.error('EventSub: Channel not found:', this.channelName);
+                    Logger.error('EventSub: Channel not found:', this.channelName);
                     this.channelId = this.userId; // Fallback to bot's channel
                 }
             } else {
@@ -174,8 +177,8 @@ export class TwitchClient {
         switch (message.metadata.message_type) {
             case 'session_welcome':
                 this.sessionId = message.payload.session.id;
-                console.log('EventSub: Got session ID:', this.sessionId);
-                console.log(`EventSub: Connected as ${this.username}`);
+                Logger.info('EventSub: Got session ID:', { session_id: this.sessionId });
+                Logger.info(`EventSub: Connected as ${this.username}`);
                 await this.subscribeToChatMessages();
                 await this.subscribeToFollows();
                 break;
@@ -328,6 +331,42 @@ export class TwitchClient {
             }
         }
     }
+
+    // Send a message to Twitch chat
+    async sendChatMessage(message) {
+        if (!this.accessToken || !this.clientId || !this.userId || !this.channelId) {
+            console.error('TwitchClient: Cannot send chat message - missing required credentials or IDs');
+            return false;
+        }
+
+        try {
+            const response = await fetch('https://api.twitch.tv/helix/chat/messages', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.accessToken}`,
+                    'Client-Id': this.clientId,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    broadcaster_id: this.channelId,
+                    sender_id: this.userId,
+                    message: message
+                })
+            });
+
+            if (response.ok) {
+                console.log('TwitchClient: Chat message sent successfully:', message);
+                return true;
+            } else {
+                const error = await response.json();
+                console.error('TwitchClient: Failed to send chat message:', error);
+                return false;
+            }
+        } catch (error) {
+            console.error('TwitchClient: Error sending chat message:', error);
+            return false;
+        }
+    }
 }
 
-export default TwitchEventSubWebSocket;
+export default TwitchClient;
