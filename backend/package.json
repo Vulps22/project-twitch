@@ -1,0 +1,27 @@
+{
+  "name": "project-twitch",
+  "version": "1.0.0",
+  "description": "A Twitch-related project.",
+  "keywords": [],
+  "homepage": "https://github.com/Vulps22/project-twitch#readme",
+  "bugs": {
+    "url": "https://github.com/Vulps22/project-twitch/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Vulps22/project-twitch.git"
+  },
+  "license": "ISC",
+  "author": "Vulps22",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.4.1",
+    "express": "^5.1.0",
+    "node-fetch": "^3.3.2",
+    "ws": "^8.18.3"
+  }
+}
