@@ -1,17 +1,48 @@
 {
+  // Hide sensitive files completely (streaming protection)
   "files.exclude": {
     "**/.env": true,
     "**/backend/.env": true,
-    "**/.env.*": true
+    "**/.env.*": true,
+    "**/node_modules": true
   },
+  
+  // Exclude from search (performance + cleanliness)
   "search.exclude": {
     "**/.env": true,
     "**/backend/.env": true,
-    "**/.env.*": true
+    "**/.env.*": true,
+    "**/node_modules": true,
+    "**/bower_components": true,
+    "**/.git": true,
+    "**/.DS_Store": true
   },
+  
+  // Exclude from file watcher (performance)
   "files.watcherExclude": {
     "**/.env": true,
     "**/backend/.env": true,
-    "**/.env.*": true
-  }
+    "**/.env.*": true,
+    "**/node_modules/**": true,
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/node_modules/*/**": true
+  },
+
+  // Clean up explorer view
+  "explorer.compactFolders": true,
+  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.expand": false,
+  "explorer.fileNesting.patterns": {
+    "package.json": "package-lock.json,npm-shrinkwrap.json,yarn.lock",
+    "*.js": "${capture}.js.map,${capture}.min.js,${capture}.d.ts",
+    "*.ts": "${capture}.js,${capture}.js.map,${capture}.min.js,${capture}.d.ts",
+    "tsconfig.json": "tsconfig.*.json",
+    ".eslintrc.*": ".eslintignore",
+    ".gitignore": ".gitattributes,.gitmodules,.gitmessage,.mailmap,.git-blame*",
+    "README*": "AUTHORS,BACKERS*,CHANGELOG*,CITATION*,CODE_OF_CONDUCT*,CONTRIBUTING*,CONTRIBUTORS,COPYING*,CREDITS,GOVERNANCE.md,HISTORY.md,LICENSE*,MAINTAINERS,NOTICE,SECURITY.md,SPONSORS*"
+  },
+
+  // Auto-collapse and organize folders
+  "explorer.sortOrder": "foldersNestsFiles"
 }
