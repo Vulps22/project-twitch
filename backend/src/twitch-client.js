@@ -16,7 +16,8 @@ export class TwitchClient {
         this.username = null;
         this.channelId = null;
         this.channelName = options.channelName || process.env.TWITCH_CHANNEL_NAME;
-        this.overlayBroadcaster = options.overlayBroadcaster || null;
+        this.overlayBroadcasterService = options.overlayBroadcasterService || null;
+        this.pointsManagerService = options.pointsManagerService || null;
         this.commandHandler = null;
         this.eventHandler = null;
         
@@ -31,7 +32,7 @@ export class TwitchClient {
         Logger.info('EventSub: Initializing Twitch EventSub WebSocket...');
         
         // Initialize handlers with dependency injection
-        this.commandHandler = new TwitchCommandHandler(this, this.overlayBroadcaster);
+        this.commandHandler = new TwitchCommandHandler(this, this.overlayBroadcasterService);
         // this.eventHandler = new TwitchEventHandler(); // TODO: Create this handler
 
         // Get user ID from Twitch API (bot account)
@@ -64,8 +65,51 @@ export class TwitchClient {
         // Check token scopes before proceeding
         await this.checkTokenScopes();
         
+        // Test getUserList API endpoint
+        Logger.info('Testing getUserList API endpoint...');
+        const userListResult = await this.getUserList();
+        if (userListResult) {
+            Logger.info('getUserList test successful!');
+        } else {
+            Logger.warn('getUserList test failed - check logs above for details');
+        }
+        
         // Connect to EventSub WebSocket
         this.connectEventSub();
+    }
+
+    /**
+     * Fetch the list of chatters in the channel
+     * @returns {Promise<Array>} List of chatters in the channel
+     */
+    async getUserList()  {
+        try {
+            //use console.log to debug the fetch call headers
+            console.log('Fetching user list...');
+            console.log('Headers:', {
+                'Authorization': `Bearer ${this.accessToken}`,
+                'broadcaster_id': this.channelId,
+                'moderator_id': this.userId
+            });
+            const response = await fetch(`https://api.twitch.tv/helix/chat/chatters?broadcaster_id=${this.channelId}&moderator_id=${this.userId}`, {
+                headers: {
+                    'Authorization': `Bearer ${this.accessToken}`,
+                    'Client-Id': this.clientId
+                }
+            });
+            Logger.log('Fetching user list response:', response);
+            if (response.ok) {
+                
+                const data = await response.json() || [];
+                return data['data'] || [];
+            } else {
+                Logger.error('Failed to get user list:', response.statusText);
+                return [];
+            }
+        } catch (error) {
+            Logger.error('Error getting user list:', error);
+            return [];
+        }
     }
 
     async getUserId() {
@@ -130,9 +174,9 @@ export class TwitchClient {
             if (response.ok) {
                 const data = await response.json();
                 console.log('EventSub: Current token scopes:', data.scopes);
-                console.log('EventSub: Required scopes: user:read:chat, user:bot, channel:bot, channel:read:subscriptions, moderator:read:followers, user:write:chat');
+                console.log('EventSub: Required scopes: user:read:chat, user:write:chat, channel:read:subscriptions, moderator:read:followers, moderator:read:chatters');
                 
-                const requiredScopes = ['user:read:chat', 'channel:read:subscriptions', 'moderator:read:followers', 'user:write:chat'];
+                const requiredScopes = ['user:read:chat', 'user:write:chat', 'channel:read:subscriptions', 'moderator:read:followers', 'moderator:read:chatters'];  
                 const missingScopes = requiredScopes.filter(scope => !data.scopes.includes(scope));
                 
                 if (missingScopes.length > 0) {
@@ -157,6 +201,9 @@ export class TwitchClient {
 
         this.websocket.onmessage = (event) => {
             const message = JSON.parse(event.data);
+            if(message.metadata.message_type == 'session_keepalive') {
+                return; // Ignore keepalive messages
+            }
             this.handleEventSubMessage(message);
         };
 
@@ -172,7 +219,7 @@ export class TwitchClient {
     }
 
     async handleEventSubMessage(message) {
-        console.log('EventSub: Received message:', message);
+        Logger.log('EventSub: Received message:', message);
 
         switch (message.metadata.message_type) {
             case 'session_welcome':
@@ -184,7 +231,7 @@ export class TwitchClient {
                 break;
 
             case 'session_keepalive':
-                console.log('EventSub: Keepalive received');
+                //console.log('EventSub: Keepalive received');
                 break;
 
             case 'notification':
@@ -298,6 +345,14 @@ export class TwitchClient {
             console.log('Timestamp:', event.message.timestamp);
             console.log('Raw Event:', event);
             console.log('=============================');
+
+            // Record user activity for points accrual
+            if (this.pointsManagerService) {
+                this.pointsManagerService.recordUserActivity(
+                    event.chatter_user_id, 
+                    event.chatter_user_display_name || event.chatter_user_name
+                );
+            }
 
             // Pass message to command handler
             if (this.commandHandler) {
