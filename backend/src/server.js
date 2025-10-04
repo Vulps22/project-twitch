@@ -1,8 +1,12 @@
 import express from 'express';
 import { WebSocketServer } from 'ws';
 import { createServer } from 'http';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import Logger from './utils/Logger.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 const app = express();
 const PORT = 3000;
 
@@ -33,7 +37,15 @@ wss.on('connection', (ws) => {
     });
 });
 
+// Serve static files
+app.use('/overlay', express.static(join(__dirname, '../../overlay')));
+app.use('/assets', express.static(join(__dirname, '../../assets')));
+
 // Express routes
+app.get('/', (req, res) => {
+    res.redirect('/overlay');
+});
+
 app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
 });

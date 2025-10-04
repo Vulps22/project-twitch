@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Twitch Command Overlay</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: transparent;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+
+        .command-output {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 1000;
+        }
+
+        .command-image {
+            max-width: 33vw;
+            max-height: 33vh;
+            object-fit: contain;
+        }
+
+        .command-video {
+            max-width: 400px;
+            max-height: 400px;
+        }
+
+        .command-text {
+            font-size: 2em;
+            font-weight: bold;
+            color: #ffffff;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            margin: 10px 0;
+        }
+
+        /* Predefined Transitions */
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        .fade-out {
+            animation: fadeOut 0.5s ease-out;
+        }
+
+        .slide-right-in {
+            animation: slideRightIn 0.5s ease-out;
+        }
+
+        .slide-right-out {
+            animation: slideRightOut 0.5s ease-in;
+        }
+
+        .slide-left-in {
+            animation: slideLeftIn 0.5s ease-out;
+        }
+
+        .slide-left-out {
+            animation: slideLeftOut 0.5s ease-in;
+        }
+
+        .scale-in {
+            animation: scaleIn 0.5s ease-out;
+        }
+
+        .scale-out {
+            animation: scaleOut 0.5s ease-in;
+        }
+
+        .bounce-in {
+            animation: bounceIn 0.8s ease-out;
+        }
+
+        .bounce-out {
+            animation: bounceOut 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes fadeOut {
+            from {
+                opacity: 1;
+            }
+
+            to {
+                opacity: 0;
+            }
+        }
+
+        @keyframes slideRightIn {
+            from {
+                transform: translate(100%, -50%);
+            }
+
+            to {
+                transform: translate(-50%, -50%);
+            }
+        }
+
+        @keyframes slideRightOut {
+            from {
+                transform: translate(-50%, -50%);
+            }
+
+            to {
+                transform: translate(-200%, -50%);
+            }
+        }
+
+        @keyframes slideLeftIn {
+            from {
+                transform: translate(-200%, -50%);
+            }
+
+            to {
+                transform: translate(-50%, -50%);
+            }
+        }
+
+        @keyframes slideLeftOut {
+            from {
+                transform: translate(-50%, -50%);
+            }
+
+            to {
+                transform: translate(100%, -50%);
+            }
+        }
+
+        @keyframes scaleIn {
+            from {
+                transform: translate(-50%, -50%) scale(0);
+            }
+
+            to {
+                transform: translate(-50%, -50%) scale(1);
+            }
+        }
+
+        @keyframes scaleOut {
+            from {
+                transform: translate(-50%, -50%) scale(1);
+            }
+
+            to {
+                transform: translate(-50%, -50%) scale(0);
+            }
+        }
+
+        @keyframes bounceIn {
+            0% {
+                transform: translate(-50%, -50%) scale(0.3);
+            }
+
+            50% {
+                transform: translate(-50%, -50%) scale(1.05);
+            }
+
+            70% {
+                transform: translate(-50%, -50%) scale(0.9);
+            }
+
+            100% {
+                transform: translate(-50%, -50%) scale(1);
+            }
+        }
+
+        @keyframes bounceOut {
+            from {
+                transform: translate(-50%, -50%) scale(1);
+            }
+
+            to {
+                transform: translate(-50%, -50%) scale(0);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="overlay-container"></div>
+
+    <script>
+        class TwitchOverlay {
+            constructor() {
+                this.ws = null;
+                this.overlayContainer = document.getElementById('overlay-container');
+                this.currentDisplay = null;
+                this.displayTimeout = null;
+                this.reconnectAttempts = 0;
+                this.maxReconnectAttempts = 5;
+                this.reconnectDelay = 1000; // Start with 1 second
+                
+                this.connect();
+            }
+
+            connect() {
+                try {
+                    // Connect to the backend WebSocket server
+                    this.ws = new WebSocket('ws://localhost:3000');
+                    
+                    this.ws.onopen = () => {
+                        console.log('Connected to Twitch backend');
+                        this.reconnectAttempts = 0;
+                        this.reconnectDelay = 1000; // Reset delay on successful connection
+                    };
+                    
+                    this.ws.onmessage = (event) => {
+                        try {
+                            const data = JSON.parse(event.data);
+                            this.handleMessage(data);
+                        } catch (error) {
+                            console.error('Error parsing WebSocket message:', error);
+                        }
+                    };
+                    
+                    this.ws.onclose = () => {
+                        console.log('Disconnected from Twitch backend');
+                        this.attemptReconnect();
+                    };
+                    
+                    this.ws.onerror = (error) => {
+                        console.error('WebSocket error:', error);
+                    };
+                    
+                } catch (error) {
+                    console.error('Failed to connect to WebSocket:', error);
+                    this.attemptReconnect();
+                }
+            }
+
+            attemptReconnect() {
+                if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+                    console.error('Max reconnection attempts reached. Please refresh the page.');
+                    return;
+                }
+
+                this.reconnectAttempts++;
+                console.log(`Attempting to reconnect... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+                
+                setTimeout(() => {
+                    this.connect();
+                }, this.reconnectDelay);
+                
+                // Exponential backoff
+                this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30000); // Max 30 seconds
+            }
+
+            handleMessage(data) {
+                console.log('Received message:', data);
+                
+                switch (data.type) {
+                    case 'connection':
+                        console.log('Backend connection confirmed:', data.message);
+                        break;
+                    case 'command':
+                        this.displayCommand(data);
+                        break;
+                    case 'event':
+                        this.displayEvent(data);
+                        break;
+                    case 'clear':
+                        this.clearDisplay();
+                        break;
+                    default:
+                        console.log('Unknown message type:', data.type);
+                }
+            }
+
+            displayCommand(commandData) {
+                // Clear any existing display
+                this.clearDisplay();
+                
+                // Create display element
+                const displayElement = document.createElement('div');
+                displayElement.className = 'command-output';
+                
+                // Add content based on what's available
+                let hasContent = false;
+                
+                // Add image if specified
+                if (commandData.image) {
+                    const img = document.createElement('img');
+                    img.className = 'command-image';
+                    img.src = `/assets/img/${commandData.image}`;
+                    img.alt = commandData.command_name || 'Command Image';
+                    
+                    // Handle image load errors
+                    img.onerror = () => {
+                        console.warn(`Image not found: ${commandData.image}`);
+                        // Optionally, you could fallback to a default image or remove the element
+                    };
+                    
+                    displayElement.appendChild(img);
+                    hasContent = true;
+                }
+                
+                // Add text if specified
+                if (commandData.text && commandData.text.trim()) {
+                    const textDiv = document.createElement('div');
+                    textDiv.className = 'command-text';
+                    textDiv.textContent = commandData.text;
+                    displayElement.appendChild(textDiv);
+                    hasContent = true;
+                }
+                
+                // Only display if we have content
+                if (hasContent) {
+                    // Add transition classes
+                    if (commandData.transition_in) {
+                        displayElement.classList.add(commandData.transition_in);
+                    }
+                    
+                    // Add to overlay
+                    this.overlayContainer.appendChild(displayElement);
+                    this.currentDisplay = displayElement;
+                    
+                    // Play sound if specified
+                    if (commandData.sound) {
+                        this.playSound(commandData.sound);
+                    }
+                    
+                    // Set timeout for removal
+                    const timeout = this.parseTimeout(commandData.timeout) || 5000; // Default 5 seconds
+                    this.displayTimeout = setTimeout(() => {
+                        this.hideDisplay(commandData.transition_out);
+                    }, timeout);
+                }
+            }
+
+            displayEvent(eventData) {
+                // Handle different event types (can be extended for follow, subscribe, etc.)
+                console.log('Displaying event:', eventData);
+                // For now, treat events similar to commands
+                this.displayCommand(eventData);
+            }
+
+            hideDisplay(transitionOut = 'fade-out') {
+                if (this.currentDisplay) {
+                    // Clear any existing classes and add exit transition
+                    this.currentDisplay.className = 'command-output ' + transitionOut;
+                    
+                    // Remove element after transition
+                    setTimeout(() => {
+                        this.clearDisplay();
+                    }, 500); // Match animation duration
+                }
+            }
+
+            clearDisplay() {
+                if (this.displayTimeout) {
+                    clearTimeout(this.displayTimeout);
+                    this.displayTimeout = null;
+                }
+                
+                if (this.currentDisplay) {
+                    this.currentDisplay.remove();
+                    this.currentDisplay = null;
+                }
+            }
+
+            playSound(soundFile) {
+                try {
+                    const audio = new Audio(`/assets/audio/${soundFile}`);
+                    audio.volume = 0.5; // Adjust as needed
+                    audio.play().catch(error => {
+                        console.warn(`Could not play sound: ${soundFile}`, error);
+                    });
+                } catch (error) {
+                    console.warn(`Sound file not found: ${soundFile}`, error);
+                }
+            }
+
+            parseTimeout(timeoutStr) {
+                if (!timeoutStr) return null;
+                
+                // Parse timeout strings like "5s", "2000ms", "3000"
+                if (typeof timeoutStr === 'number') return timeoutStr;
+                if (typeof timeoutStr === 'string') {
+                    if (timeoutStr.endsWith('s')) {
+                        return parseFloat(timeoutStr) * 1000;
+                    } else if (timeoutStr.endsWith('ms')) {
+                        return parseFloat(timeoutStr);
+                    } else {
+                        return parseFloat(timeoutStr);
+                    }
+                }
+                return null;
+            }
+        }
+
+        // Initialize the overlay when the page loads
+        window.addEventListener('DOMContentLoaded', () => {
+            new TwitchOverlay();
+        });
+    </script>
+</body>
+
+</html>
