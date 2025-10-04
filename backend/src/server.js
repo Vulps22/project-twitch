@@ -1,6 +1,7 @@
 import express from 'express';
 import { WebSocketServer } from 'ws';
 import { createServer } from 'http';
+import Logger from './utils/Logger.js';
 
 const app = express();
 const PORT = 3000;
@@ -13,7 +14,7 @@ const wss = new WebSocketServer({ server });
 
 // Handle WebSocket connections
 wss.on('connection', (ws) => {
-    console.log('Overlay connected');
+    Logger.info('Overlay connected');
     
     // Send a test message to the overlay
     ws.send(JSON.stringify({
@@ -23,12 +24,12 @@ wss.on('connection', (ws) => {
     
     // Listen for messages from overlay (if needed)
     ws.on('message', (data) => {
-        console.log('Received from overlay:', data.toString());
+        Logger.debug('Received from overlay:', data.toString());
     });
     
     // Handle disconnect
     ws.on('close', () => {
-        console.log('Overlay disconnected');
+        Logger.info('Overlay disconnected');
     });
 });
 
@@ -39,6 +40,9 @@ app.get('/health', (req, res) => {
 
 // Start server
 server.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-    console.log(`WebSocket server ready on ws://localhost:${PORT}`);
+    Logger.info(`Server running on http://localhost:${PORT}`);
+    Logger.info(`WebSocket server ready on ws://localhost:${PORT}`);
 });
+
+// Export WebSocket server for other modules to use
+export { wss, app, server };

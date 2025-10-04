@@ -1,0 +1,17 @@
+{
+  "files.exclude": {
+    "**/.env": true,
+    "**/backend/.env": true,
+    "**/.env.*": true
+  },
+  "search.exclude": {
+    "**/.env": true,
+    "**/backend/.env": true,
+    "**/.env.*": true
+  },
+  "files.watcherExclude": {
+    "**/.env": true,
+    "**/backend/.env": true,
+    "**/.env.*": true
+  }
+}
