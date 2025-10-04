@@ -4,9 +4,9 @@
 import Logger from '../utils/Logger.js';
 
 export class Handler {
-    constructor(twitchClient = null, overlayBroadcaster = null) {
+    constructor(twitchClient = null, overlayBroadcasterService = null) {
         this.twitchClient = twitchClient;
-        this.overlayBroadcaster = overlayBroadcaster;
+        this.overlayBroadcasterService = overlayBroadcasterService;
         this.container = null; // You can set this up for dependency injection
     }
 
@@ -23,7 +23,7 @@ export class Handler {
             Logger.warn('Would send chat reply (no TwitchClient):', this.processTemplate(config.reply, templateData));
         }
         
-        // Handle overlay events - delegate to overlay broadcaster
+        // Handle overlay events - delegate to overlay broadcaster service
         if (config.image || config.sound || config.text) {
             const overlayEvent = {
                 type: 'command',
@@ -37,10 +37,10 @@ export class Handler {
             };
             
             Logger.info('Sending overlay event:', overlayEvent);
-            if (this.overlayBroadcaster) {
-                await this.overlayBroadcaster.broadcast(overlayEvent);
+            if (this.overlayBroadcasterService) {
+                await this.overlayBroadcasterService.broadcast(overlayEvent);
             } else {
-                Logger.warn('Would send overlay event (no broadcaster):', overlayEvent);
+                Logger.warn('Would send overlay event (no broadcaster service):', overlayEvent);
             }
         }
     }
@@ -67,8 +67,8 @@ export class Handler {
         this.twitchClient = twitchClient;
     }
 
-    setOverlayBroadcaster(overlayBroadcaster) {
-        this.overlayBroadcaster = overlayBroadcaster;
+    setOverlayBroadcasterService(overlayBroadcasterService) {
+        this.overlayBroadcasterService = overlayBroadcasterService;
     }
 }
 

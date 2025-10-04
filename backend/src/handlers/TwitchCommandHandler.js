@@ -9,8 +9,8 @@ import Logger from '../utils/Logger.js';
 
 
 export class TwitchCommandHandler extends Handler {
-    constructor(twitchClient = null, overlayBroadcaster = null) {
-        super(twitchClient, overlayBroadcaster);
+    constructor(twitchClient = null, overlayBroadcasterService = null) {
+        super(twitchClient, overlayBroadcasterService);
         this.commands = {};
         this.modules = {};
         this.init();
