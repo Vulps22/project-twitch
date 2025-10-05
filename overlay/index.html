@@ -198,6 +198,10 @@
 
     <script>
         class TwitchOverlay {
+
+            playingMedia = [];
+            queuedConfigs = [];
+
             constructor() {
                 this.ws = null;
                 this.overlayContainer = document.getElementById('overlay-container');
@@ -206,7 +210,9 @@
                 this.reconnectAttempts = 0;
                 this.maxReconnectAttempts = 5;
                 this.reconnectDelay = 1000; // Start with 1 second
-                
+
+                // Media end handling is now done directly in onended callbacks
+
                 this.connect();
             }
 
@@ -214,13 +220,13 @@
                 try {
                     // Connect to the backend WebSocket server
                     this.ws = new WebSocket('ws://localhost:3000');
-                    
+
                     this.ws.onopen = () => {
                         console.log('Connected to Twitch backend');
                         this.reconnectAttempts = 0;
                         this.reconnectDelay = 1000; // Reset delay on successful connection
                     };
-                    
+
                     this.ws.onmessage = (event) => {
                         try {
                             const data = JSON.parse(event.data);
@@ -229,16 +235,16 @@
                             console.error('Error parsing WebSocket message:', error);
                         }
                     };
-                    
+
                     this.ws.onclose = () => {
                         console.log('Disconnected from Twitch backend');
                         this.attemptReconnect();
                     };
-                    
+
                     this.ws.onerror = (error) => {
                         console.error('WebSocket error:', error);
                     };
-                    
+
                 } catch (error) {
                     console.error('Failed to connect to WebSocket:', error);
                     this.attemptReconnect();
@@ -253,18 +259,18 @@
 
                 this.reconnectAttempts++;
                 console.log(`Attempting to reconnect... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-                
+
                 setTimeout(() => {
                     this.connect();
                 }, this.reconnectDelay);
-                
+
                 // Exponential backoff
                 this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30000); // Max 30 seconds
             }
 
             handleMessage(data) {
                 console.log('Received message:', data);
-                
+
                 switch (data.type) {
                     case 'connection':
                         console.log('Backend connection confirmed:', data.message);
@@ -284,33 +290,71 @@
             }
 
             displayCommand(commandData) {
+
+                const shouldqueue = this.shouldQueue();
+
+                if (shouldqueue) {
+                    this.queuedConfigs.push(commandData);
+                    return;
+                }
+
                 // Clear any existing display
                 this.clearDisplay();
-                
+
                 // Create display element
                 const displayElement = document.createElement('div');
                 displayElement.className = 'command-output';
-                
+
                 // Add content based on what's available
                 let hasContent = false;
-                
-                // Add image if specified
-                if (commandData.image) {
+
+                // Add video if specified
+                if (commandData.video) {
+                    const video = document.createElement('video');
+                    video.className = 'command-video';
+                    video.src = `/assets/video/${commandData.video}`;
+                    video.autoplay = true;
+                    video.muted = true; // Muted to allow autoplay in browsers
+                    video.loop = false;
+                    video.controls = false;
+
+                    // Handle video load errors
+                    video.onerror = () => {
+                        console.warn(`Video not found: ${commandData.video}`);
+                    };
+
+                    // Optional: Log when video starts/ends
+                    video.onloadeddata = () => {
+                        console.log(`Video loaded: ${commandData.video}`);
+                        this.playingMedia.push(video);
+                    };
+
+                    video.onended = () => {
+                        console.log(`Video ended: ${commandData.video}`);
+                        this.onMediaEnded(video, 'video', commandData.video);
+                    };
+
+                    displayElement.appendChild(video);
+                    hasContent = true;
+                }
+
+                // Add image if specified (and no video)
+                if (commandData.image && !commandData.video) {
                     const img = document.createElement('img');
                     img.className = 'command-image';
                     img.src = `/assets/img/${commandData.image}`;
                     img.alt = commandData.command_name || 'Command Image';
-                    
+
                     // Handle image load errors
                     img.onerror = () => {
                         console.warn(`Image not found: ${commandData.image}`);
                         // Optionally, you could fallback to a default image or remove the element
                     };
-                    
+
                     displayElement.appendChild(img);
                     hasContent = true;
                 }
-                
+
                 // Add text if specified
                 if (commandData.text && commandData.text.trim()) {
                     const textDiv = document.createElement('div');
@@ -319,23 +363,23 @@
                     displayElement.appendChild(textDiv);
                     hasContent = true;
                 }
-                
+
                 // Only display if we have content
                 if (hasContent) {
                     // Add transition classes
                     if (commandData.transition_in) {
                         displayElement.classList.add(commandData.transition_in);
                     }
-                    
+
                     // Add to overlay
                     this.overlayContainer.appendChild(displayElement);
                     this.currentDisplay = displayElement;
-                    
+
                     // Play sound if specified
                     if (commandData.sound) {
                         this.playSound(commandData.sound);
                     }
-                    
+
                     // Set timeout for removal
                     const timeout = this.parseTimeout(commandData.timeout) || 5000; // Default 5 seconds
                     this.displayTimeout = setTimeout(() => {
@@ -344,6 +388,14 @@
                 }
             }
 
+            shouldQueue() {
+                return this.currentDisplay !== null || this.playingMedia.length > 0;
+            }
+
+            /**
+             * @deprecated Use displayCommand for command events only.
+             * This method can be extended to handle different event types in the future.
+            **/
             displayEvent(eventData) {
                 // Handle different event types (can be extended for follow, subscribe, etc.)
                 console.log('Displaying event:', eventData);
@@ -355,7 +407,7 @@
                 if (this.currentDisplay) {
                     // Clear any existing classes and add exit transition
                     this.currentDisplay.className = 'command-output ' + transitionOut;
-                    
+
                     // Remove element after transition
                     setTimeout(() => {
                         this.clearDisplay();
@@ -368,7 +420,7 @@
                     clearTimeout(this.displayTimeout);
                     this.displayTimeout = null;
                 }
-                
+
                 if (this.currentDisplay) {
                     this.currentDisplay.remove();
                     this.currentDisplay = null;
@@ -379,17 +431,42 @@
                 try {
                     const audio = new Audio(`/assets/audio/${soundFile}`);
                     audio.volume = 0.5; // Adjust as needed
+                    
+                    // Track audio in playing media
+                    this.playingMedia.push(audio);
+                    
+                    // Handle audio end
+                    audio.onended = () => {
+                        console.log(`Audio ended: ${soundFile}`);
+                        this.onMediaEnded(audio, 'audio', soundFile);
+                    };
+                    
                     audio.play().catch(error => {
                         console.warn(`Could not play sound: ${soundFile}`, error);
+                        // Remove from playing media if play failed
+                        this.playingMedia = this.playingMedia.filter(media => media !== audio);
                     });
                 } catch (error) {
                     console.warn(`Sound file not found: ${soundFile}`, error);
                 }
             }
 
+            onMediaEnded(mediaElement, mediaType, fileName) {
+                console.log(`${mediaType} ended: ${fileName}`);
+                
+                // Remove from playing media array
+                this.playingMedia = this.playingMedia.filter(media => media !== mediaElement);
+                
+                // Process next queued command if any
+                if (this.queuedConfigs.length > 0) {
+                    const nextConfig = this.queuedConfigs.shift();
+                    this.displayCommand(nextConfig);
+                }
+            }
+
             parseTimeout(timeoutStr) {
                 if (!timeoutStr) return null;
-                
+
                 // Parse timeout strings like "5s", "2000ms", "3000"
                 if (typeof timeoutStr === 'number') return timeoutStr;
                 if (typeof timeoutStr === 'string') {
