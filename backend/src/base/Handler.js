@@ -30,6 +30,7 @@ export class Handler {
                 command_name: config.command_name,
                 image: config.image,
                 sound: config.sound,
+                video: config.video,
                 text: this.processTemplate(config.text || '', templateData),
                 transition_in: config.transition_in,
                 transition_out: config.transition_out,
