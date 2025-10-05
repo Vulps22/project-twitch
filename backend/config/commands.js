@@ -17,6 +17,11 @@ export const COMMANDS = {
         "command_name": "discord",
         "reply": "\nJoin our Discord: https://discord.vulps.co.uk",
     },
+    "sus": {
+        "command_name": "sus",
+        "sound": "lurk.mp3",
+        "reply": "{{username}} is sus!",
+    },
     "spam": {
         "command_name": "spam",
         "reply": "!spam",

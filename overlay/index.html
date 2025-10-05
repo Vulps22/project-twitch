@@ -364,7 +364,12 @@
                     hasContent = true;
                 }
 
-                // Only display if we have content
+                // Play sound regardless of visual content
+                if (commandData.sound) {
+                    this.playSound(commandData.sound);
+                }
+
+                // Only display visual elements if we have content
                 if (hasContent) {
                     // Add transition classes
                     if (commandData.transition_in) {
@@ -374,11 +379,6 @@
                     // Add to overlay
                     this.overlayContainer.appendChild(displayElement);
                     this.currentDisplay = displayElement;
-
-                    // Play sound if specified
-                    if (commandData.sound) {
-                        this.playSound(commandData.sound);
-                    }
 
                     // Set timeout for removal
                     const timeout = this.parseTimeout(commandData.timeout) || 5000; // Default 5 seconds

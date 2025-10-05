@@ -24,7 +24,7 @@ export class Handler {
         }
         
         // Handle overlay events - delegate to overlay broadcaster service
-        if (config.image || config.sound || config.text) {
+        if (config.image || config.sound || config.text || config.video) {
             const overlayEvent = {
                 type: 'command',
                 command_name: config.command_name,
