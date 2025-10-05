@@ -3,7 +3,6 @@
 
 import WebSocket from 'ws';
 import fetch from 'node-fetch';
-import TwitchCommandHandler from './handlers/TwitchCommandHandler.js';
 import Logger from './utils/Logger.js';
 
 export class TwitchClient {
@@ -18,8 +17,8 @@ export class TwitchClient {
         this.channelName = options.channelName || process.env.TWITCH_CHANNEL_NAME;
         this.overlayBroadcasterService = options.overlayBroadcasterService || null;
         this.pointsManagerService = options.pointsManagerService || null;
-        this.commandHandler = null;
-        this.eventHandler = null;
+        this.commandHandler = options.commandHandler || null;
+        this.eventHandler = options.eventHandler || null;
         
         if (!this.accessToken || !this.clientId) {
             throw new Error('Access token and client ID are required. Provide them via constructor options or environment variables.');
@@ -31,9 +30,13 @@ export class TwitchClient {
     async init() {
         Logger.info('EventSub: Initializing Twitch EventSub WebSocket...');
         
-        // Initialize handlers with dependency injection
-        this.commandHandler = new TwitchCommandHandler(this, this.overlayBroadcasterService);
-        // this.eventHandler = new TwitchEventHandler(); // TODO: Create this handler
+        // Handlers are now injected via constructor - no need to create them here
+        if (this.commandHandler) {
+            Logger.info('TwitchClient: Command handler injected and ready');
+        }
+        if (this.eventHandler) {
+            Logger.info('TwitchClient: Event handler injected and ready');
+        }
 
         // Get user ID from Twitch API (bot account)
         await this.getUserId();
