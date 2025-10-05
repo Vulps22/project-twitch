@@ -34,7 +34,10 @@ export class TwitchCommandHandler extends Handler {
     // Main method to process chat messages and execute commands
     processChatMessage(messageText, userInfo) {
         Logger.debug('TwitchCommandHandler: Processing message:', messageText);
-        
+        if(userInfo.user_id === this.twitchClient.userId) {
+            return;
+        }
+
         if (messageText.startsWith('!')) {
             const commandText = messageText.substring(1);
             const commandName = commandText.split(' ')[0].toLowerCase();
