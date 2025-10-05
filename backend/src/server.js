@@ -8,7 +8,7 @@ import Logger from './utils/Logger.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const app = express();
-const PORT = 3000;
+const PORT = 3001;
 
 // Create HTTP server (needed for WebSocket)
 const server = createServer(app);
@@ -48,6 +48,46 @@ app.get('/', (req, res) => {
 
 app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
+});
+
+// Points system API endpoints
+app.get('/api/points/stats', async (req, res) => {
+    try {
+        const { pointsManagerService } = await import('../index.js');
+        if (pointsManagerService) {
+            const stats = pointsManagerService.getStats();
+            res.json(stats);
+        } else {
+            res.status(503).json({ error: 'Points system not initialized' });
+        }
+    } catch (error) {
+        res.status(500).json({ error: 'Points system not available' });
+    }
+});
+
+app.get('/api/points/viewers', async (req, res) => {
+    try {
+        const { pointsManagerService, twitchClient } = await import('../index.js');
+        if (pointsManagerService && twitchClient) {
+            const twitchViewers = await twitchClient.getUserList();
+            const viewers = pointsManagerService.getActiveViewers();
+            res.json({ activeViewers: viewers, twitchViewers: twitchViewers });
+        } else {
+            res.status(503).json({ error: 'Points system not initialized' });
+        }
+    } catch (error) {
+        res.status(500).json({ error: 'Points system not available' });
+    }
+});
+
+app.get('/api/database/stats', async (req, res) => {
+    try {
+        const { getDatabaseStats } = await import('../utils/database.js');
+        const stats = getDatabaseStats();
+        res.json(stats);
+    } catch (error) {
+        res.status(500).json({ error: 'Database not available' });
+    }
 });
 
 // Start server

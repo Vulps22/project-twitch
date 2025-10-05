@@ -192,6 +192,12 @@ Thumbs.db
 !.vscode/
 !.vscode/settings.json
 
+# Database files (contain user data)
+backend/data/
+*.db
+*.sqlite
+*.sqlite3
+
 # Logs
 logs
 *.log

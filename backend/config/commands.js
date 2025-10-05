@@ -16,6 +16,28 @@ export const COMMANDS = {
     "discord": {
         "command_name": "discord",
         "reply": "\nJoin our Discord: https://discord.vulps.co.uk",
+    },
+    "sus": {
+        "command_name": "sus",
+        "cost": 10,
+        "sound": "lurk.mp3",
+        "reply": "{{username}} is sus!",
+    },
+    "dancingfox": {
+        "command_name": "dancingfox",
+        "cost": 100,
+        "video": "follow-dance.mp4"
+    },
+    "vindication": {
+        "command_name": "vindication",
+        "cost": 50,
+        "sound": "vindication.mp3",
+        "volume": 1.0,
+        "reply": "Vindication sound played for {{username}}!"
+    },
+    "spam": {
+        "command_name": "spam",
+        "reply": "!spam",
     }
 };
 

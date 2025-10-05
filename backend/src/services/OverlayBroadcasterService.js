@@ -1,9 +1,9 @@
-// Overlay Broadcaster
+// Overlay Broadcaster Service
 // Handles broadcasting events to WebSocket clients (overlays)
 
 import Logger from '../utils/Logger.js';
 
-export class OverlayBroadcaster {
+export class OverlayBroadcasterService {
     constructor(wss = null) {
         this.wss = wss; // WebSocket server instance
     }
@@ -67,4 +67,4 @@ export class OverlayBroadcaster {
     }
 }
 
-export default OverlayBroadcaster;
+export default OverlayBroadcasterService;

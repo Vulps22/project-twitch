@@ -4,15 +4,22 @@
 import Logger from '../utils/Logger.js';
 
 export class Handler {
-    constructor(twitchClient = null, overlayBroadcaster = null) {
+    constructor(twitchClient = null, overlayBroadcasterService = null) {
         this.twitchClient = twitchClient;
-        this.overlayBroadcaster = overlayBroadcaster;
+        this.overlayBroadcasterService = overlayBroadcasterService;
         this.container = null; // You can set this up for dependency injection
     }
 
     async executeConfig(config, templateData) {
         Logger.debug('Handler: Executing config:', config);
         Logger.debug('Handler: Template data:', templateData);
+        
+        // DEBUG: Log the volume field specifically
+        console.log('=== VOLUME DEBUG ===');
+        console.log('config.volume:', config.volume);
+        console.log('typeof config.volume:', typeof config.volume);
+        console.log('config object keys:', Object.keys(config));
+        console.log('==================');
         
         // Handle reply messages - delegate to TwitchClient
         if (config.reply && this.twitchClient) {
@@ -23,24 +30,33 @@ export class Handler {
             Logger.warn('Would send chat reply (no TwitchClient):', this.processTemplate(config.reply, templateData));
         }
         
-        // Handle overlay events - delegate to overlay broadcaster
-        if (config.image || config.sound || config.text) {
+        // Handle overlay events - delegate to overlay broadcaster service
+        if (config.image || config.sound || config.text || config.video) {
             const overlayEvent = {
                 type: 'command',
                 command_name: config.command_name,
                 image: config.image,
                 sound: config.sound,
+                volume: config.volume,
+                video: config.video,
                 text: this.processTemplate(config.text || '', templateData),
                 transition_in: config.transition_in,
                 transition_out: config.transition_out,
                 timeout: config.timeout
             };
             
+            // DEBUG: Log overlay event details
+            console.log('=== OVERLAY EVENT DEBUG ===');
+            console.log('overlayEvent.volume:', overlayEvent.volume);
+            console.log('overlayEvent keys:', Object.keys(overlayEvent));
+            console.log('Full overlayEvent:', JSON.stringify(overlayEvent, null, 2));
+            console.log('==========================');
+            
             Logger.info('Sending overlay event:', overlayEvent);
-            if (this.overlayBroadcaster) {
-                await this.overlayBroadcaster.broadcast(overlayEvent);
+            if (this.overlayBroadcasterService) {
+                await this.overlayBroadcasterService.broadcast(overlayEvent);
             } else {
-                Logger.warn('Would send overlay event (no broadcaster):', overlayEvent);
+                Logger.warn('Would send overlay event (no broadcaster service):', overlayEvent);
             }
         }
     }
@@ -67,8 +83,8 @@ export class Handler {
         this.twitchClient = twitchClient;
     }
 
-    setOverlayBroadcaster(overlayBroadcaster) {
-        this.overlayBroadcaster = overlayBroadcaster;
+    setOverlayBroadcasterService(overlayBroadcasterService) {
+        this.overlayBroadcasterService = overlayBroadcasterService;
     }
 }
 
