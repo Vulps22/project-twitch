@@ -39,7 +39,7 @@ try {
         
         // Create handlers first (they need to be created before TwitchClient)
         // Note: TwitchClient will be passed to handlers after it's created
-        commandHandler = new TwitchCommandHandler(null, overlayBroadcasterService);
+        commandHandler = new TwitchCommandHandler(null, overlayBroadcasterService, pointsManagerService);
         eventHandler = new TwitchEventHandler(null, overlayBroadcasterService);
         Logger.info('Handlers created');
         

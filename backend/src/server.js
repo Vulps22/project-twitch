@@ -8,7 +8,7 @@ import Logger from './utils/Logger.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const app = express();
-const PORT = 3000;
+const PORT = 3001;
 
 // Create HTTP server (needed for WebSocket)
 const server = createServer(app);

@@ -1,7 +1,7 @@
 // Points Manager Service
 // Handles automatic points accrual for active viewers
 
-import { getUser, createUser, addPoints } from '../utils/database.js';
+import { getUser, createUser, addPoints, spendPoints } from '../utils/database.js';
 import { POINTS_CONFIG } from '../../config/points.js';
 import Logger from '../utils/Logger.js';
 
@@ -157,7 +157,7 @@ export class PointsManagerService {
 
         try {
             // Check if user exists in database
-            let user = getUser(twitchId);
+            let user = await getUser(twitchId);
             
             // Create user if they don't exist
             if (!user) {
@@ -182,7 +182,11 @@ export class PointsManagerService {
         }
     }
 
-    // Get current active viewers count
+    /**
+     * Get the count of currently active viewers
+     * @returns {number} Count of currently active viewers
+     * @deprecated TODO: create alternative
+     */
     getActiveViewersCount() {
         const now = Date.now();
         let activeCount = 0;
@@ -221,6 +225,26 @@ export class PointsManagerService {
         }
         
         return activeUsers;
+    }
+
+    async canUserAfford(twitchId, cost) {
+        const points = await this.getUserPoints(twitchId);
+        return points >= cost; //user has more points and can afford: true
+    }
+
+    async getUserPoints(twitchId) {
+        const user = await getUser(twitchId);
+        return user ? user.points : 0;
+    }
+
+    spendUserPoints(twitchId, amount, reason) {
+        if (!this.canUserAfford(twitchId, amount)) {
+            throw new Error('Insufficient points');
+        }
+
+        spendPoints(twitchId, amount, reason);
+
+        
     }
 
     // Get points accrual statistics

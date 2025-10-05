@@ -9,8 +9,9 @@ import Logger from '../utils/Logger.js';
 
 
 export class TwitchCommandHandler extends Handler {
-    constructor(twitchClient = null, overlayBroadcasterService = null) {
+    constructor(twitchClient = null, overlayBroadcasterService = null, pointsManagerService = null) {
         super(twitchClient, overlayBroadcasterService);
+        this.pointsManagerService = pointsManagerService;
         this.commands = {};
         this.modules = {};
         this.init();
@@ -34,7 +35,7 @@ export class TwitchCommandHandler extends Handler {
     // Main method to process chat messages and execute commands
     processChatMessage(messageText, userInfo) {
         Logger.debug('TwitchCommandHandler: Processing message:', messageText);
-        if(userInfo.user_id === this.twitchClient.userId) {
+        if (userInfo.user_id === this.twitchClient.userId) {
             return;
         }
 
@@ -42,14 +43,14 @@ export class TwitchCommandHandler extends Handler {
             const commandText = messageText.substring(1);
             const commandName = commandText.split(' ')[0].toLowerCase();
             const args = commandText.split(' ').slice(1);
-            
+
             Logger.logWithContext('COMMAND', 'Command detected:', {
                 command_text: commandText,
                 command_name: commandName,
                 arguments: args,
                 user_info: userInfo
             });
-            
+
             this.executeCommand(commandName, args, userInfo);
         }
     }
@@ -60,17 +61,33 @@ export class TwitchCommandHandler extends Handler {
         console.log('Available commands:', Object.keys(this.commands));
         console.log('Command found:', !!this.commands[commandName]);
         console.log('======================');
-        
+
         if (this.commands[commandName]) {
             console.log('Executing JSON command:', this.commands[commandName]);
-            
+
             // Prepare template data
             const templateData = {
                 username: userInfo && userInfo.display_name ? userInfo.display_name : (userInfo && userInfo.username ? userInfo.username : '')
             };
-            
+
+            const commandConfig = this.commands[commandName];
+            const cost = commandConfig.cost || 0;
+
+            if (await this.pointsManagerService.canUserAfford(userInfo.user_id, cost)) {
+                this.pointsManagerService.spendUserPoints(userInfo.user_id, cost, commandName);
+                this.executeConfig(commandConfig, templateData);
+            } else {
+                // Notify user of insufficient points
+                if (this.twitchClient) {
+                    const message = `@${templateData.username}, you do not have enough points to use the !${commandName} command.`;
+                    await this.twitchClient.sendChatMessage(message);
+                } else {
+                    console.log(`Would notify ${templateData.username} of insufficient points (no TwitchClient)`);
+                }
+            }
+
             // Use base class method
-            await this.executeConfig(this.commands[commandName], templateData);
+
         } else if (await this.loadModule(commandName)) {
             console.log('Executing module command:', commandName);
             await this.executeModuleCommand(commandName, args, userInfo);

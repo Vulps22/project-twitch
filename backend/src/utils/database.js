@@ -12,6 +12,9 @@ const __dirname = dirname(__filename);
 // Database file path (go up 3 levels: utils -> src -> backend -> root, then into backend/data)
 const DB_PATH = join(__dirname, '..', '..', 'data', 'twitch.db');
 
+/**
+ * @type {Database.Database}
+ */
 let db = null;
 
 // Initialize database connection and create tables
@@ -63,6 +66,7 @@ function createTables() {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id TEXT NOT NULL,
             amount INTEGER NOT NULL,
+            type TEXT CHECK(type IN ('add', 'subtract')) NOT NULL,
             reason TEXT NOT NULL,
             timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             refunded BOOLEAN DEFAULT 0,
@@ -97,7 +101,7 @@ function createIndexes() {
 }
 
 // Get user by Twitch ID
-export function getUser(twitchId) {
+export async function getUser(twitchId) {
     if (!db) throw new Error('Database not initialized');
     
     try {
@@ -165,10 +169,10 @@ export function addPoints(twitchId, amount, reason) {
             
             // Log transaction
             const logStmt = db.prepare(`
-                INSERT INTO transactions (user_id, amount, reason, timestamp)
-                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                INSERT INTO transactions (user_id, amount, type, reason, timestamp)
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
             `);
-            logStmt.run(twitchId, amount, reason);
+            logStmt.run(twitchId, amount, 'add', reason);
         });
         
         transaction();
@@ -184,7 +188,7 @@ export function addPoints(twitchId, amount, reason) {
 // Spend points (deduct from user balance)
 export function spendPoints(twitchId, amount, reason) {
     if (!db) throw new Error('Database not initialized');
-    if (amount <= 0) throw new Error('Amount must be positive for spending points');
+    if (amount < 0) throw new Error('Amount must be positive for spending points');
     
     try {
         // Start transaction
@@ -211,10 +215,10 @@ export function spendPoints(twitchId, amount, reason) {
             
             // Log transaction (negative amount for spending)
             const logStmt = db.prepare(`
-                INSERT INTO transactions (user_id, amount, reason, timestamp)
-                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                INSERT INTO transactions (user_id, amount, type, reason, timestamp)
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
             `);
-            logStmt.run(twitchId, -amount, reason);
+            logStmt.run(twitchId, amount, 'subtract', reason);
         });
         
         transaction();
@@ -227,18 +231,25 @@ export function spendPoints(twitchId, amount, reason) {
     }
 }
 
-// Log a transaction (manual transaction logging)
-export function logTransaction(twitchId, amount, reason) {
+/**
+ * Log a transaction
+ * @param {*} twitchId 
+ * @param {*} amount - Integer representing the change in point value for the user. Always a positive integer. see {type} for +/-
+ * @param {*} type - 'add' or 'subtract'
+ * @param {*} reason 
+ * @returns 
+ */
+export function logTransaction(twitchId, amount, type = 'subtract', reason) {
     if (!db) throw new Error('Database not initialized');
     
     try {
         const stmt = db.prepare(`
-            INSERT INTO transactions (user_id, amount, reason, timestamp)
-            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            INSERT INTO transactions (user_id, amount, type, reason, timestamp)
+            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
         `);
-        
-        const result = stmt.run(twitchId, amount, reason);
-        Logger.info('Transaction logged:', { twitch_id: twitchId, amount, reason });
+
+        const result = stmt.run(twitchId, amount, type, reason);
+        Logger.info('Transaction logged:', { twitch_id: twitchId, amount, type, reason });
         return result.changes > 0;
     } catch (error) {
         Logger.error('Error logging transaction:', error);

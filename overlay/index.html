@@ -219,7 +219,7 @@
             connect() {
                 try {
                     // Connect to the backend WebSocket server
-                    this.ws = new WebSocket('ws://localhost:3000');
+                    this.ws = new WebSocket('ws://localhost:3001');
 
                     this.ws.onopen = () => {
                         console.log('Connected to Twitch backend');
@@ -366,7 +366,7 @@
 
                 // Play sound regardless of visual content
                 if (commandData.sound) {
-                    this.playSound(commandData.sound);
+                    this.playSound(commandData.sound, commandData.volume);
                 }
 
                 // Only display visual elements if we have content
@@ -427,11 +427,11 @@
                 }
             }
 
-            playSound(soundFile) {
+            playSound(soundFile, volume) {
                 try {
                     const audio = new Audio(`/assets/audio/${soundFile}`);
-                    audio.volume = 0.5; // Adjust as needed
-                    
+                    audio.volume = volume !== undefined ? volume : 0.5; // Use specified volume or default to 0.5
+
                     // Track audio in playing media
                     this.playingMedia.push(audio);
                     

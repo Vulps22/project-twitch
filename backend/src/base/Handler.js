@@ -14,6 +14,13 @@ export class Handler {
         Logger.debug('Handler: Executing config:', config);
         Logger.debug('Handler: Template data:', templateData);
         
+        // DEBUG: Log the volume field specifically
+        console.log('=== VOLUME DEBUG ===');
+        console.log('config.volume:', config.volume);
+        console.log('typeof config.volume:', typeof config.volume);
+        console.log('config object keys:', Object.keys(config));
+        console.log('==================');
+        
         // Handle reply messages - delegate to TwitchClient
         if (config.reply && this.twitchClient) {
             const message = this.processTemplate(config.reply, templateData);
@@ -30,12 +37,20 @@ export class Handler {
                 command_name: config.command_name,
                 image: config.image,
                 sound: config.sound,
+                volume: config.volume,
                 video: config.video,
                 text: this.processTemplate(config.text || '', templateData),
                 transition_in: config.transition_in,
                 transition_out: config.transition_out,
                 timeout: config.timeout
             };
+            
+            // DEBUG: Log overlay event details
+            console.log('=== OVERLAY EVENT DEBUG ===');
+            console.log('overlayEvent.volume:', overlayEvent.volume);
+            console.log('overlayEvent keys:', Object.keys(overlayEvent));
+            console.log('Full overlayEvent:', JSON.stringify(overlayEvent, null, 2));
+            console.log('==========================');
             
             Logger.info('Sending overlay event:', overlayEvent);
             if (this.overlayBroadcasterService) {
