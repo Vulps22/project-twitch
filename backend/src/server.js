@@ -53,6 +53,12 @@ app.get('/health', (req, res) => {
 // Points system API endpoints
 app.get('/api/points/stats', async (req, res) => {
     try {
+        const { POINTS_CONFIG } = await import('../config/points.js');
+        if (!POINTS_CONFIG.enabled) {
+            res.json({ error: 'Points system is disabled' });
+            return;
+        }
+        
         const { pointsManagerService } = await import('../index.js');
         if (pointsManagerService) {
             const stats = pointsManagerService.getStats();
@@ -67,6 +73,12 @@ app.get('/api/points/stats', async (req, res) => {
 
 app.get('/api/points/viewers', async (req, res) => {
     try {
+        const { POINTS_CONFIG } = await import('../config/points.js');
+        if (!POINTS_CONFIG.enabled) {
+            res.json({ error: 'Points system is disabled' });
+            return;
+        }
+        
         const { pointsManagerService, twitchClient } = await import('../index.js');
         if (pointsManagerService && twitchClient) {
             const twitchViewers = await twitchClient.getUserList();

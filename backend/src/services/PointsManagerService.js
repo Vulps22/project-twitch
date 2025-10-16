@@ -19,6 +19,11 @@ export class PointsManagerService {
 
     // Start the points accrual system
     start() {
+        if (!this.config.enabled) {
+            Logger.info('PointsManagerService: Points system is disabled, not starting');
+            return;
+        }
+        
         if (this.accrualTimer) {
             Logger.warn('PointsManagerService: Already running');
             return;
@@ -51,6 +56,10 @@ export class PointsManagerService {
      * @deprecated Will be removed in future  - No alternative
      */
     recordUserActivity(twitchId, username) {
+        if (!this.config.enabled) {
+            return; // Skip activity recording when points system is disabled
+        }
+        
         const now = Date.now();
         
         this.activeViewers.set(twitchId, {
@@ -228,6 +237,9 @@ export class PointsManagerService {
     }
 
     async canUserAfford(twitchId, cost) {
+        if (!this.config.enabled) {
+            return true; // Always afford when points system is disabled
+        }
         const points = await this.getUserPoints(twitchId);
         return points >= cost; //user has more points and can afford: true
     }
@@ -238,6 +250,10 @@ export class PointsManagerService {
     }
 
     spendUserPoints(twitchId, amount, reason) {
+        if (!this.config.enabled) {
+            return; // Skip spending points when system is disabled
+        }
+        
         if (!this.canUserAfford(twitchId, amount)) {
             throw new Error('Insufficient points');
         }

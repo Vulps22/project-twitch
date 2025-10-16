@@ -349,7 +349,7 @@ export class TwitchClient {
             console.log('Raw Event:', event);
             console.log('=============================');
 
-            // Record user activity for points accrual
+            // Record user activity for points accrual (only if points system is enabled)
             if (this.pointsManagerService) {
                 this.pointsManagerService.recordUserActivity(
                     event.chatter_user_id, 

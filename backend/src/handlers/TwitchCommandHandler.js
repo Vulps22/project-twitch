@@ -3,6 +3,7 @@
 
 // Import dependencies
 import { COMMANDS } from '../../config/commands.js';
+import { POINTS_CONFIG } from '../../config/points.js';
 import { Handler } from '../base/Handler.js';
 import Logger from '../utils/Logger.js';
 
@@ -73,17 +74,26 @@ export class TwitchCommandHandler extends Handler {
             const commandConfig = this.commands[commandName];
             const cost = commandConfig.cost || 0;
 
-            if (await this.pointsManagerService.canUserAfford(userInfo.user_id, cost)) {
+            // Check if points system is enabled and if user can afford the command
+            if (!POINTS_CONFIG.enabled || cost === 0) {
+                // Points system disabled or free command - execute immediately
+                this.executeConfig(commandConfig, templateData);
+            } else if (this.pointsManagerService && await this.pointsManagerService.canUserAfford(userInfo.user_id, cost)) {
+                // Points system enabled and user can afford it
                 this.pointsManagerService.spendUserPoints(userInfo.user_id, cost, commandName);
                 this.executeConfig(commandConfig, templateData);
-            } else {
-                // Notify user of insufficient points
+            } else if (this.pointsManagerService) {
+                // Points system enabled but user cannot afford it
                 if (this.twitchClient) {
                     const message = `@${templateData.username}, you do not have enough points to use the !${commandName} command.`;
                     await this.twitchClient.sendChatMessage(message);
                 } else {
                     console.log(`Would notify ${templateData.username} of insufficient points (no TwitchClient)`);
                 }
+            } else {
+                // Points system enabled but no points manager service - execute anyway
+                Logger.warn('Points system enabled but no PointsManagerService available, executing command anyway');
+                this.executeConfig(commandConfig, templateData);
             }
 
             // Use base class method
