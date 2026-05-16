@@ -6,7 +6,6 @@ import 'dotenv/config';
 // Import services and components
 import { TwitchClient } from './src/twitch-client.js';
 import OverlayBroadcasterService from './src/services/OverlayBroadcasterService.js';
-import PointsManagerService from './src/services/PointsManagerService.js';
 import TwitchCommandHandler from './src/handlers/TwitchCommandHandler.js';
 import TwitchEventHandler from './src/handlers/TwitchEventHanndler.js';
 import Logger from './src/utils/Logger.js';
@@ -19,7 +18,6 @@ Logger.info('Starting Twitch project backend...');
 // Global references (accessible throughout the app)
 let twitchClient = null;
 let overlayBroadcasterService = null;
-let pointsManagerService = null;
 let commandHandler = null;
 let eventHandler = null;
 
@@ -29,27 +27,22 @@ try {
     overlayBroadcasterService = new OverlayBroadcasterService(wss);
     Logger.info('Overlay broadcaster service initialized');
 
-    // Set up points manager service
-    pointsManagerService = new PointsManagerService();
-    Logger.info('Points manager service initialized');
-
     // Initialize Twitch client if credentials are available
     if (process.env.TWITCH_ACCESS_TOKEN && process.env.TWITCH_CLIENT_ID) {
         Logger.info('Initializing Twitch EventSub client...');
-        
+
         // Create handlers first (they need to be created before TwitchClient)
         // Note: TwitchClient will be passed to handlers after it's created
-        commandHandler = new TwitchCommandHandler(null, overlayBroadcasterService, pointsManagerService);
+        commandHandler = new TwitchCommandHandler(null, overlayBroadcasterService);
         eventHandler = new TwitchEventHandler(null, overlayBroadcasterService);
         Logger.info('Handlers created');
-        
+
         // Create TwitchClient with all dependencies
         twitchClient = new TwitchClient({
             accessToken: process.env.TWITCH_ACCESS_TOKEN,
             clientId: process.env.TWITCH_CLIENT_ID,
             channelName: process.env.TWITCH_CHANNEL_NAME, // optional
             overlayBroadcasterService: overlayBroadcasterService,
-            pointsManagerService: pointsManagerService,
             commandHandler: commandHandler,
             eventHandler: eventHandler
         });
@@ -57,15 +50,10 @@ try {
         // Wire up circular dependencies
         commandHandler.setTwitchClient(twitchClient);
         eventHandler.setTwitchClient(twitchClient);
-        pointsManagerService.setTwitchClient(twitchClient);
-        
+
         Logger.info('Service dependencies wired up');
         Logger.info('Twitch client initialized successfully!');
-        
-        // Start points accrual system
-        pointsManagerService.start();
-        Logger.info('Points accrual system started');
-        
+
     } else {
         Logger.warn('Twitch credentials not found in environment variables.');
         Logger.info('To enable Twitch integration, set:');
@@ -79,4 +67,4 @@ try {
 }
 
 // Export services so other modules can access them
-export { twitchClient, overlayBroadcasterService, pointsManagerService, commandHandler, eventHandler };
+export { twitchClient, overlayBroadcasterService, commandHandler, eventHandler };
