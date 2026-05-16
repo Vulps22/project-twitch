@@ -10,9 +10,9 @@ import { wss } from './src/server.js';
 
 Logger.info('Starting Twitch project backend...');
 
-let twitchClient = null;
-let overlayBroadcasterService = null;
-let eventRouter = null;
+let twitchClient: TwitchClient | null = null;
+let overlayBroadcasterService: OverlayBroadcasterService | null = null;
+let eventRouter: EventRouter | null = null;
 
 try {
     overlayBroadcasterService = new OverlayBroadcasterService(wss);
@@ -37,7 +37,7 @@ try {
         Logger.warn('Twitch credentials not found — set TWITCH_ACCESS_TOKEN, TWITCH_CLIENT_ID, TWITCH_CHANNEL_NAME');
     }
 } catch (error) {
-    Logger.error('Failed to initialise services:', error.message);
+    Logger.error('Failed to initialise services:', error instanceof Error ? error.message : String(error));
 }
 
 export { twitchClient, overlayBroadcasterService, eventRouter };
