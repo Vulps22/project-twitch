@@ -30,7 +30,7 @@ Every piece of work is prefixed with its GitHub issue number. Every commit must 
 
 | Type | Format | Example |
 |---|---|---|
-| Branch | `<issue> - <slug>` | `22 - define-baseEventType` |
+| Branch | `<issue>-<slug>` | `22-define-baseEventType` |
 | Commit | `#<issue> - <description>` (≤50 chars) | `#22 - Add BaseEventType class` |
 | PR title | `[#<issue>] <description>` | `[#22] Define BaseEventType contract` |
 
