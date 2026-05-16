@@ -36,6 +36,8 @@ Every piece of work is prefixed with its GitHub issue number. Every commit must 
 
 Feature branches are cut from the milestone branch and PR'd back into it. The milestone branch PRs into `main` when complete. PR titles are the source for automated changelog generation.
 
+**Commit discipline:** Never bundle unrelated changes into one commit to avoid a messy diff. Use `git add -p` to stage hunks, or `git cherry-pick` to isolate work. A commit that touches two responsibilities should be two commits. Prefer smaller and correct over larger and convenient.
+
 ## Working Style
 
 **Never begin executing tasks without explicit instruction to do so.** Plan, present, confirm — then wait for the user to say go.
