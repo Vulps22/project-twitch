@@ -20,6 +20,7 @@
     "start": "npm run build && node dist/backend/index.js",
     "dev": "tsx --watch backend/index.ts",
     "start-fail": "node dist/backend/index.js",
+    "auth": "tsx auth.ts",
     "stream-check": "tsx verify-streaming-safety.ts",
     "test": "vitest run",
     "test:watch": "vitest"
