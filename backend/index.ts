@@ -24,6 +24,7 @@ try {
 
         twitchClient = new TwitchClient({
             accessToken: process.env.TWITCH_ACCESS_TOKEN,
+            broadcasterToken: process.env.TWITCH_BROADCASTER_TOKEN,
             clientId: process.env.TWITCH_CLIENT_ID,
             channelName: process.env.TWITCH_CHANNEL_NAME,
             overlayBroadcasterService,

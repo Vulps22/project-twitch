@@ -1,9 +1,9 @@
-import WebSocket from 'ws';
 import fetch from 'node-fetch';
 import Logger from './utils/Logger.js';
+import { EventSubSession } from './EventSubSession.js';
+import type { EventSubNotification } from './EventSubSession.js';
 import type { TwitchRawEvent, IEventRouter, IOverlayBroadcaster } from './types.js';
 
-// Local interfaces for Twitch API responses — typed to what we actually use
 interface TwitchUserData {
     id: string
     display_name: string
@@ -22,19 +22,9 @@ interface TwitchSubscribeError {
     error?: string
 }
 
-interface EventSubMessage {
-    metadata: {
-        message_type: string
-    }
-    payload: {
-        session?: { id: string }
-        subscription?: { type: string }
-        event?: Record<string, unknown>
-    }
-}
-
 export interface TwitchClientOptions {
     accessToken?: string
+    broadcasterToken?: string
     clientId?: string
     channelName?: string
     overlayBroadcasterService?: IOverlayBroadcaster
@@ -42,9 +32,8 @@ export interface TwitchClientOptions {
 }
 
 export class TwitchClient {
-    private websocket: WebSocket | null;
-    private sessionId: string | null;
     private accessToken: string;
+    private broadcasterToken: string;
     private clientId: string;
     private userId: string | null;
     private username: string | null;
@@ -52,11 +41,10 @@ export class TwitchClient {
     private channelName: string | null;
     private overlayBroadcasterService: IOverlayBroadcaster | null;
     private eventRouter: IEventRouter | null;
+    private botSession: EventSubSession;
+    private broadcasterSession: EventSubSession | null;
 
     constructor(options: TwitchClientOptions = {}) {
-        this.websocket = null;
-        this.sessionId = null;
-
         const accessToken = options.accessToken ?? process.env.TWITCH_ACCESS_TOKEN;
         const clientId = options.clientId ?? process.env.TWITCH_CLIENT_ID;
 
@@ -65,6 +53,7 @@ export class TwitchClient {
         }
 
         this.accessToken = accessToken;
+        this.broadcasterToken = options.broadcasterToken ?? process.env.TWITCH_BROADCASTER_TOKEN ?? accessToken;
         this.clientId = clientId;
         this.userId = null;
         this.username = null;
@@ -72,6 +61,22 @@ export class TwitchClient {
         this.channelName = options.channelName ?? process.env.TWITCH_CHANNEL_NAME ?? null;
         this.overlayBroadcasterService = options.overlayBroadcasterService ?? null;
         this.eventRouter = options.eventRouter ?? null;
+
+        const notify = (n: EventSubNotification) => this.handleNotification(n);
+
+        this.botSession = new EventSubSession(
+            this.accessToken, this.clientId, 'bot',
+            (sessionId) => this.subscribeBotEvents(sessionId),
+            notify
+        );
+
+        this.broadcasterSession = this.broadcasterToken !== this.accessToken
+            ? new EventSubSession(
+                this.broadcasterToken, this.clientId, 'broadcaster',
+                (sessionId) => this.subscribeBroadcasterEvents(sessionId),
+                notify
+            )
+            : null;
 
         this.init();
     }
@@ -86,7 +91,9 @@ export class TwitchClient {
         }
 
         await this.checkTokenScopes();
-        this.connectEventSub();
+
+        this.botSession.connect();
+        this.broadcasterSession?.connect();
     }
 
     setEventRouter(eventRouter: IEventRouter): void {
@@ -143,101 +150,97 @@ export class TwitchClient {
     }
 
     private async checkTokenScopes(): Promise<void> {
+        if (this.broadcasterSession) {
+            await this.validateScopes(this.accessToken, 'bot', [
+                'user:read:chat',
+                'user:write:chat',
+                'moderator:read:followers',
+                'moderator:read:chatters',
+            ]);
+            await this.validateScopes(this.broadcasterToken, 'broadcaster', [
+                'channel:read:subscriptions',
+                'channel:read:redemptions',
+                'bits:read',
+            ]);
+        } else {
+            await this.validateScopes(this.accessToken, 'single-account', [
+                'user:read:chat',
+                'user:write:chat',
+                'moderator:read:followers',
+                'channel:read:subscriptions',
+                'channel:read:redemptions',
+                'bits:read',
+            ]);
+        }
+    }
+
+    private async validateScopes(token: string, label: string, required: string[]): Promise<void> {
         try {
             const response = await fetch('https://id.twitch.tv/oauth2/validate', {
-                headers: { 'Authorization': `Bearer ${this.accessToken}` }
+                headers: { 'Authorization': `Bearer ${token}` }
             });
 
             if (response.ok) {
                 const data = await response.json() as TwitchTokenValidation;
-                const required = [
-                    'user:read:chat',
-                    'user:write:chat',
-                    'channel:read:subscriptions',
-                    'moderator:read:followers',
-                    'moderator:read:chatters',
-                    'channel:read:redemptions'
-                ];
                 const missing = required.filter(s => !data.scopes.includes(s));
                 if (missing.length > 0) {
-                    Logger.warn('TwitchClient: Missing token scopes:', missing);
+                    Logger.warn(`TwitchClient: ${label} token missing scopes:`, missing);
+                } else {
+                    Logger.info(`TwitchClient: ${label} token scopes OK`);
                 }
             }
         } catch (error) {
-            Logger.error('TwitchClient: Error validating token:', error);
+            Logger.error(`TwitchClient: Error validating ${label} token:`, error);
         }
     }
 
-    private connectEventSub(): void {
-        this.websocket = new WebSocket('wss://eventsub.wss.twitch.tv/ws');
-
-        this.websocket.onopen = () => Logger.info('TwitchClient: EventSub connected');
-
-        this.websocket.onmessage = (event) => {
-            const message = JSON.parse(event.data as string) as EventSubMessage;
-            if (message.metadata.message_type === 'session_keepalive') return;
-            this.handleEventSubMessage(message);
-        };
-
-        this.websocket.onclose = (event) => {
-            Logger.warn('TwitchClient: EventSub closed:', event.code, event.reason);
-            setTimeout(() => this.connectEventSub(), 5000);
-        };
-
-        this.websocket.onerror = (error) => Logger.error('TwitchClient: WebSocket error:', error);
-    }
-
-    private async handleEventSubMessage(message: EventSubMessage): Promise<void> {
-        switch (message.metadata.message_type) {
-            case 'session_welcome':
-                this.sessionId = message.payload.session?.id ?? null;
-                Logger.info('TwitchClient: Session ready');
-                await this.subscribeToAll();
-                break;
-
-            case 'notification':
-                this.handleNotification(message);
-                break;
-
-            case 'session_reconnect':
-                Logger.info('TwitchClient: Reconnect requested');
-                break;
-        }
-    }
-
-    private async subscribeToAll(): Promise<void> {
+    private async subscribeBotEvents(sessionId: string): Promise<void> {
         await this.subscribe('channel.chat.message', '1', {
             broadcaster_user_id: this.channelId,
             user_id: this.userId
-        });
+        }, this.accessToken, sessionId);
+
         await this.subscribe('channel.follow', '2', {
             broadcaster_user_id: this.channelId,
             moderator_user_id: this.userId
-        });
-        await this.subscribe('channel.subscribe', '1', {
-            broadcaster_user_id: this.channelId
-        });
+        }, this.accessToken, sessionId);
+
         await this.subscribe('channel.raid', '1', {
             to_broadcaster_user_id: this.channelId
-        });
+        }, this.accessToken, sessionId);
+
+        // In single-account mode, broadcaster events also go through this session
+        if (!this.broadcasterSession) {
+            await this.subscribeBroadcasterEvents(sessionId);
+        }
+    }
+
+    private async subscribeBroadcasterEvents(sessionId: string): Promise<void> {
+        await this.subscribe('channel.subscribe', '1', {
+            broadcaster_user_id: this.channelId
+        }, this.broadcasterToken, sessionId);
+
         await this.subscribe('channel.cheer', '1', {
             broadcaster_user_id: this.channelId
-        });
+        }, this.broadcasterToken, sessionId);
+
         await this.subscribe('channel.channel_points_custom_reward_redemption.add', '1', {
             broadcaster_user_id: this.channelId
-        });
+        }, this.broadcasterToken, sessionId);
     }
 
     private async subscribe(
         type: string,
         version: string,
-        condition: Record<string, string | null>
+        condition: Record<string, string | null>,
+        token: string,
+        sessionId: string
     ): Promise<void> {
         try {
             const response = await fetch('https://api.twitch.tv/helix/eventsub/subscriptions', {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${this.accessToken}`,
+                    'Authorization': `Bearer ${token}`,
                     'Client-Id': this.clientId,
                     'Content-Type': 'application/json'
                 },
@@ -245,7 +248,7 @@ export class TwitchClient {
                     type,
                     version,
                     condition,
-                    transport: { method: 'websocket', session_id: this.sessionId }
+                    transport: { method: 'websocket', session_id: sessionId }
                 })
             });
 
@@ -260,25 +263,23 @@ export class TwitchClient {
         }
     }
 
-    handleNotification(message: EventSubMessage): void {
+    handleNotification(notification: EventSubNotification): void {
         if (!this.eventRouter) return;
 
-        const subType = message.payload.subscription?.type;
-        const event = message.payload.event;
-
-        Logger.debug('TwitchClient: Raw event received:', { subscriptionType: subType, event });
+        const { subscriptionType, event } = notification;
 
         // Skip own bot messages
         if (
-            subType === 'channel.chat.message'
-            && event?.['chatter_user_id'] === this.userId
-        ) return;
+            subscriptionType === 'channel.chat.message'
+            && event['chatter_user_id'] === this.userId
+        ) {
+            Logger.info('TwitchClient: Skipping own bot message');
+            return;
+        }
 
-        const rawEvent: TwitchRawEvent = {
-            subscriptionType: subType ?? '',
-            event: event ?? {}
-        };
+        const rawEvent: TwitchRawEvent = { subscriptionType, event };
 
+        Logger.info('TwitchClient: Routing to EventRouter');
         this.eventRouter.route(rawEvent);
     }
 

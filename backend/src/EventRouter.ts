@@ -33,14 +33,20 @@ export class EventRouter extends Handler {
     }
 
     async route(rawEvent: TwitchRawEvent): Promise<void> {
-        Logger.log('EventRouter: Received event:', rawEvent);
+        Logger.info(`EventRouter: Routing "${rawEvent.subscriptionType}"`);
+        let matched = false;
         for (const eventType of this.eventTypes) {
             for (const config of this.configs) {
                 if (eventType.match(rawEvent, config)) {
+                    Logger.info(`EventRouter: Matched [${eventType.type}] → "${config.event_name}"`);
                     const templateData: TemplateData = eventType.extractTemplateData(rawEvent);
                     await this.executeConfig(config, templateData);
+                    matched = true;
                 }
             }
+        }
+        if (!matched) {
+            Logger.info(`EventRouter: No match for "${rawEvent.subscriptionType}"`);
         }
     }
 
