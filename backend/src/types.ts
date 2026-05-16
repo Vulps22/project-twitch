@@ -38,7 +38,7 @@ export interface ITwitchClient {
 }
 
 export interface IOverlayBroadcaster {
-    broadcast(event: OverlayEvent): Promise<void>
+    broadcast(event: OverlayEvent): Promise<boolean>
 }
 
 export interface IEventRouter {
