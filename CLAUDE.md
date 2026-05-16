@@ -60,6 +60,8 @@ git fetch origin && git checkout BRANCH_NAME
 
 **Commit discipline:** Never bundle unrelated changes into one commit to avoid a messy diff. Use `git add -p` to stage hunks, or `git cherry-pick` to isolate work. A commit that touches two responsibilities should be two commits. Prefer smaller and correct over larger and convenient.
 
+**Issue creation:** Never create multiple GitHub issues in parallel (e.g. with `&`). GitHub assigns numbers sequentially — parallel creation produces non-deterministic ordering and mismatches between issue numbers and titles. Create issues one at a time.
+
 ## Working Style
 
 **Never begin executing tasks without explicit instruction to do so.** Plan, present, confirm — then wait for the user to say go.
