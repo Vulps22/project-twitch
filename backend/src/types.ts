@@ -34,7 +34,7 @@ export interface OverlayEvent {
 }
 
 export interface ITwitchClient {
-    sendChatMessage(message: string): Promise<void>
+    sendChatMessage(message: string): Promise<boolean>
 }
 
 export interface IOverlayBroadcaster {
