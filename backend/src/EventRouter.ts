@@ -33,6 +33,7 @@ export class EventRouter extends Handler {
     }
 
     async route(rawEvent: TwitchRawEvent): Promise<void> {
+        Logger.log('EventRouter: Received event:', rawEvent);
         for (const eventType of this.eventTypes) {
             for (const config of this.configs) {
                 if (eventType.match(rawEvent, config)) {
@@ -48,8 +49,9 @@ export class EventRouter extends Handler {
         const files = await readdir(dir);
 
         for (const file of files) {
-            // Load .js files — compiled output in dist/ will be .js
-            if (!file.endsWith('.js')) continue;
+            // Accept .js (compiled) and .ts (tsx dev mode); skip declaration files
+            if (file.endsWith('.d.ts')) continue;
+            if (!file.endsWith('.js') && !file.endsWith('.ts')) continue;
 
             const module = await import(pathToFileURL(join(dir, file)).href) as Record<string, unknown>;
 
