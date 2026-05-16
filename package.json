@@ -16,11 +16,15 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "start": "node --watch backend/index.js",
-    "start-fail": "node backend/index.js",
-    "stream-check": "node verify-streaming-safety.js",
-    "test-logger": "node test-logger.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsc",
+    "start": "npm run build && node dist/backend/index.js",
+    "dev": "tsx --watch backend/index.ts",
+    "start-fail": "node dist/backend/index.js",
+    "auth:bot": "tsx auth.ts bot",
+    "auth:streamer": "tsx auth.ts streamer",
+    "stream-check": "tsx verify-streaming-safety.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "better-sqlite3": "^12.4.1",
@@ -28,5 +32,14 @@
     "express": "^5.1.0",
     "node-fetch": "^3.3.2",
     "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.8.0",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.22.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.6"
   }
 }

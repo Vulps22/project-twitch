@@ -1,20 +1,19 @@
-// Overlay Broadcaster Service
-// Handles broadcasting events to WebSocket clients (overlays)
-
+import { WebSocketServer, WebSocket as WsClient } from 'ws';
 import Logger from '../utils/Logger.js';
+import type { IOverlayBroadcaster, OverlayEvent } from '../types.js';
 
-export class OverlayBroadcasterService {
-    constructor(wss = null) {
-        this.wss = wss; // WebSocket server instance
-    }
+export class OverlayBroadcasterService implements IOverlayBroadcaster {
+    private wss: WebSocketServer | null;
 
-    // Set the WebSocket server instance
-    setWebSocketServer(wss) {
+    constructor(wss: WebSocketServer | null = null) {
         this.wss = wss;
     }
 
-    // Broadcast event to all connected overlay clients
-    async broadcast(event) {
+    setWebSocketServer(wss: WebSocketServer): void {
+        this.wss = wss;
+    }
+
+    async broadcast(event: OverlayEvent): Promise<boolean> {
         if (!this.wss) {
             Logger.warn('OverlayBroadcaster: No WebSocket server available');
             return false;
@@ -24,7 +23,7 @@ export class OverlayBroadcasterService {
         let sentCount = 0;
 
         this.wss.clients.forEach((client) => {
-            if (client.readyState === 1) { // WebSocket.OPEN
+            if (client.readyState === WsClient.OPEN) {
                 try {
                     client.send(message);
                     sentCount++;
@@ -38,9 +37,8 @@ export class OverlayBroadcasterService {
         return sentCount > 0;
     }
 
-    // Send event to specific client (if needed)
-    async sendToClient(client, event) {
-        if (client.readyState === 1) { // WebSocket.OPEN
+    async sendToClient(client: WsClient, event: OverlayEvent): Promise<boolean> {
+        if (client.readyState === WsClient.OPEN) {
             try {
                 client.send(JSON.stringify(event));
                 Logger.debug('OverlayBroadcaster: Sent event to specific client:', event);
@@ -53,13 +51,12 @@ export class OverlayBroadcasterService {
         return false;
     }
 
-    // Get count of connected clients
-    getClientCount() {
+    getClientCount(): number {
         if (!this.wss) return 0;
-        
+
         let count = 0;
         this.wss.clients.forEach((client) => {
-            if (client.readyState === 1) {
+            if (client.readyState === WsClient.OPEN) {
                 count++;
             }
         });
