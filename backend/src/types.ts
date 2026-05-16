@@ -40,3 +40,7 @@ export interface ITwitchClient {
 export interface IOverlayBroadcaster {
     broadcast(event: OverlayEvent): Promise<void>
 }
+
+export interface IEventRouter {
+    route(rawEvent: TwitchRawEvent): Promise<void>
+}
