@@ -266,6 +266,8 @@ export class TwitchClient {
         const subType = message.payload.subscription?.type;
         const event = message.payload.event;
 
+        Logger.debug('TwitchClient: Raw event received:', { subscriptionType: subType, event });
+
         // Skip own bot messages
         if (
             subType === 'channel.chat.message'
