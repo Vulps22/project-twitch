@@ -2,7 +2,7 @@
 import 'dotenv/config';
 
 const CLIENT_ID = process.env.TWITCH_CLIENT_ID;
-const REDIRECT_URI = 'https://localhost';
+const REDIRECT_URI = 'http://localhost';
 const SCOPES = [
     'user:read:chat',
     'user:write:chat',
@@ -10,6 +10,7 @@ const SCOPES = [
     'moderator:read:followers',
     'moderator:read:chatters',
     'channel:read:redemptions',
+    'bits:read',
 ];
 
 if (!CLIENT_ID) {

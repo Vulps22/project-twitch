@@ -24,9 +24,10 @@ describe('buildAuthUrl', () => {
         expect(scopes).toContain('moderator:read:followers')
         expect(scopes).toContain('moderator:read:chatters')
         expect(scopes).toContain('channel:read:redemptions')
+        expect(scopes).toContain('bits:read')
     })
 
-    it('redirects to https://localhost', () => {
-        expect(url.searchParams.get('redirect_uri')).toBe('https://localhost')
+    it('redirects to http://localhost', () => {
+        expect(url.searchParams.get('redirect_uri')).toBe('http://localhost')
     })
 })
