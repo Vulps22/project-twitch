@@ -24,6 +24,18 @@ npm run stream-check  # Verify streaming safety config
 
 No test framework or linter is configured.
 
+## Branch, Commit and PR Conventions
+
+Every piece of work is prefixed with its GitHub issue number. Every commit must leave the codebase in a runnable state and cover a single responsibility.
+
+| Type | Format | Example |
+|---|---|---|
+| Branch | `<issue> - <slug>` | `22 - define-baseEventType` |
+| Commit | `#<issue> - <description>` (≤50 chars) | `#22 - Add BaseEventType class` |
+| PR title | `[#<issue>] <description>` | `[#22] Define BaseEventType contract` |
+
+Feature branches are cut from the milestone branch and PR'd back into it. The milestone branch PRs into `main` when complete. PR titles are the source for automated changelog generation.
+
 ## Working Style
 
 **Never begin executing tasks without explicit instruction to do so.** Plan, present, confirm — then wait for the user to say go.
