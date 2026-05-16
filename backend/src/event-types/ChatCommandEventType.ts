@@ -1,4 +1,5 @@
 import { BaseEventType } from './BaseEventType.js';
+import Logger from '../utils/Logger.js';
 import type { EventConfig, TemplateData, TwitchRawEvent } from '../types.js';
 
 export class ChatCommandEventType extends BaseEventType {
@@ -10,7 +11,10 @@ export class ChatCommandEventType extends BaseEventType {
         if (config.event_type !== this.type) return false;
         const event = rawEvent.event as { message: { text: string } };
         const command = this.#parseCommand(event.message.text);
-        return command !== null && (config.trigger_on ?? []).includes(command);
+        const triggers = config.trigger_on ?? [];
+        const matched = command !== null && triggers.includes(command);
+        Logger.info(`ChatCommand: parsed="${command}" config="${config.event_name}" triggers=[${triggers.join(', ')}] → ${matched ? 'MATCH' : 'no match'}`);
+        return matched;
     }
 
     extractTemplateData(rawEvent: TwitchRawEvent): TemplateData {

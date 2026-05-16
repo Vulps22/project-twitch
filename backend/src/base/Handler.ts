@@ -14,8 +14,17 @@ export class Handler {
     }
 
     async executeConfig(config: EventConfig, templateData: TemplateData): Promise<void> {
-        if (config.reply && this.twitchClient) {
-            await this.twitchClient.sendChatMessage(this.processTemplate(config.reply, templateData));
+        Logger.info(`Handler: Executing "${config.event_name}"`);
+
+        if (config.reply) {
+            if (this.twitchClient) {
+                const message = this.processTemplate(config.reply, templateData);
+                Logger.info(`Handler: Sending chat reply: "${message}"`);
+                const ok = await this.twitchClient.sendChatMessage(message);
+                Logger.info(`Handler: Chat reply ${ok ? 'sent' : 'FAILED'}`);
+            } else {
+                Logger.warn('Handler: Skipping reply — twitchClient not set');
+            }
         }
 
         if (config.image || config.sound || config.text || config.video) {
@@ -33,7 +42,10 @@ export class Handler {
             };
 
             if (this.overlayBroadcasterService) {
+                Logger.info(`Handler: Broadcasting overlay event for "${config.event_name}"`);
                 await this.overlayBroadcasterService.broadcast(overlayEvent);
+            } else {
+                Logger.warn('Handler: Skipping overlay broadcast — overlayBroadcasterService not set');
             }
         }
     }
