@@ -3,8 +3,54 @@
 // To add a new event, add it to the EVENTS object below
 
 export const EVENTS = {
+    "lurk": {
+        "event_name": "lurk",
+        "event_type": "chat_command",
+        "trigger_on": ["lurk"],
+        "image": "lurk.png",
+        "sound": "lurk.mp3",
+        "text": "{{username}}",
+        "reply": "Thank you for lurking, {{username}}!",
+        "transition_in": "fade-in",
+        "transition_out": "fade-out",
+        "timeout": "6s"
+    },
+    "discord": {
+        "event_name": "discord",
+        "event_type": "chat_command",
+        "trigger_on": ["discord"],
+        "reply": "\nJoin our Discord: https://discord.vulps.co.uk",
+    },
+    "sus": {
+        "event_name": "sus",
+        "event_type": "chat_command",
+        "trigger_on": ["sus"],
+        "sound": "lurk.mp3",
+        "reply": "{{username}} is sus!",
+    },
+    "dancingfox": {
+        "event_name": "dancingfox",
+        "event_type": "chat_command",
+        "trigger_on": ["dancingfox"],
+        "video": "follow-dance.mp4"
+    },
+    "vindication": {
+        "event_name": "vindication",
+        "event_type": "chat_command",
+        "trigger_on": ["vindication"],
+        "sound": "vindication.mp3",
+        "volume": 1.0,
+        "reply": "Vindication sound played for {{username}}!"
+    },
+    "spam": {
+        "event_name": "spam",
+        "event_type": "chat_command",
+        "trigger_on": ["spam"],
+        "reply": "!spam",
+    },
     "follow": {
         "event_name": "follow",
+        "event_type": "follow",
         "text": "{{username}} is following!",
         "video": "follow-dance.mp4",
         "sound": "follow.mp3",
@@ -15,6 +61,7 @@ export const EVENTS = {
     },
     "subscription": {
         "event_name": "subscription",
+        "event_type": "subscription",
         "text": "{{username}} just subscribed!",
         "reply": "Welcome to the community, {{username}}!",
         "transition_in": "scale-in",
@@ -23,6 +70,7 @@ export const EVENTS = {
     },
     "raid": {
         "event_name": "raid",
+        "event_type": "raid",
         "text": "{{username}} is raiding with {{count}} viewers!",
         "reply": "Thanks for the raid, {{username}}!",
         "transition_in": "slide-right-in",
@@ -30,14 +78,5 @@ export const EVENTS = {
         "timeout": "8s"
     }
 };
-
-// Helper functions (optional)
-export function getEventNames() {
-    return Object.keys(EVENTS);
-}
-
-export function getEvent(name) {
-    return EVENTS[name.toLowerCase()];
-}
 
 export default EVENTS;

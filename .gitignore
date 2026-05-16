@@ -192,6 +192,9 @@ Thumbs.db
 !.vscode/
 !.vscode/settings.json
 
+# Assets (streamer media files — managed locally, not in version control)
+assets/
+
 # Database files (contain user data)
 backend/data/
 *.db
