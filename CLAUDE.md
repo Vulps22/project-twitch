@@ -34,7 +34,29 @@ Every piece of work is prefixed with its GitHub issue number. Every commit must 
 | Commit | `#<issue> - <description>` (≤50 chars) | `#22 - Add BaseEventType class` |
 | PR title | `[#<issue>] <description>` | `[#22] Define BaseEventType contract` |
 
-Feature branches are cut from the milestone branch and PR'd back into it. The milestone branch PRs into `main` when complete. PR titles are the source for automated changelog generation.
+Feature branches are cut from the milestone branch and PR'd back into it. **Always create branches via the GraphQL API** so they appear in the issue's Development panel — do not use `git checkout -b`:
+
+```bash
+# 1. Get IDs (run once per milestone)
+gh api graphql -f query='{
+  repository(owner: "Vulps22", name: "project-twitch") {
+    id
+    issue(number: ISSUE_NUM) { id }
+    ref(qualifiedName: "MILESTONE_BRANCH") { target { oid } }
+  }
+}' --jq '.data.repository'
+
+# 2. Create linked branch
+gh api graphql -f query='mutation {
+  createLinkedBranch(input: {
+    issueId: "ISSUE_ID", oid: "OID",
+    name: "BRANCH_NAME", repositoryId: "REPO_ID"
+  }) { linkedBranch { ref { name } } }
+}'
+
+# 3. Fetch locally
+git fetch origin && git checkout BRANCH_NAME
+``` The milestone branch PRs into `main` when complete. PR titles are the source for automated changelog generation.
 
 **Commit discipline:** Never bundle unrelated changes into one commit to avoid a messy diff. Use `git add -p` to stage hunks, or `git cherry-pick` to isolate work. A commit that touches two responsibilities should be two commits. Prefer smaller and correct over larger and convenient.
 
