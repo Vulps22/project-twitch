@@ -61,21 +61,9 @@ export class Handler {
         }
     }
 
-    // Template processing method to replace placeholders like {{username}}
     processTemplate(template, data) {
         if (!template) return '';
-        
-        let result = template;
-        
-        // Replace {{username}} with actual username
-        if (data.username) {
-            result = result.replace(/\{\{username\}\}/g, data.username);
-        }
-        
-        // Add more template variables as needed
-        // result = result.replace(/\{\{other_var\}\}/g, data.other_var);
-        
-        return result;
+        return template.replace(/\{\{(\w+)\}\}/g, (_, key) => data[key] ?? '');
     }
 
     // Set dependencies after construction
