@@ -35,6 +35,7 @@ interface EventSubMessage {
 
 export interface TwitchClientOptions {
     accessToken?: string
+    broadcasterToken?: string
     clientId?: string
     channelName?: string
     overlayBroadcasterService?: IOverlayBroadcaster
@@ -45,6 +46,7 @@ export class TwitchClient {
     private websocket: WebSocket | null;
     private sessionId: string | null;
     private accessToken: string;
+    private broadcasterToken: string;
     private clientId: string;
     private userId: string | null;
     private username: string | null;
@@ -65,6 +67,7 @@ export class TwitchClient {
         }
 
         this.accessToken = accessToken;
+        this.broadcasterToken = options.broadcasterToken ?? process.env.TWITCH_BROADCASTER_TOKEN ?? accessToken;
         this.clientId = clientId;
         this.userId = null;
         this.username = null;
@@ -143,28 +146,48 @@ export class TwitchClient {
     }
 
     private async checkTokenScopes(): Promise<void> {
+        await this.validateScopes(this.accessToken, 'bot', [
+            'user:read:chat',
+            'user:write:chat',
+            'moderator:read:followers',
+            'moderator:read:chatters',
+        ]);
+
+        if (this.broadcasterToken !== this.accessToken) {
+            await this.validateScopes(this.broadcasterToken, 'broadcaster', [
+                'channel:read:subscriptions',
+                'channel:read:redemptions',
+                'bits:read',
+            ]);
+        } else {
+            await this.validateScopes(this.accessToken, 'single-account', [
+                'user:read:chat',
+                'user:write:chat',
+                'moderator:read:followers',
+                'channel:read:subscriptions',
+                'channel:read:redemptions',
+                'bits:read',
+            ]);
+        }
+    }
+
+    private async validateScopes(token: string, label: string, required: string[]): Promise<void> {
         try {
             const response = await fetch('https://id.twitch.tv/oauth2/validate', {
-                headers: { 'Authorization': `Bearer ${this.accessToken}` }
+                headers: { 'Authorization': `Bearer ${token}` }
             });
 
             if (response.ok) {
                 const data = await response.json() as TwitchTokenValidation;
-                const required = [
-                    'user:read:chat',
-                    'user:write:chat',
-                    'channel:read:subscriptions',
-                    'moderator:read:followers',
-                    'moderator:read:chatters',
-                    'channel:read:redemptions'
-                ];
                 const missing = required.filter(s => !data.scopes.includes(s));
                 if (missing.length > 0) {
-                    Logger.warn('TwitchClient: Missing token scopes:', missing);
+                    Logger.warn(`TwitchClient: ${label} token missing scopes:`, missing);
+                } else {
+                    Logger.info(`TwitchClient: ${label} token scopes OK`);
                 }
             }
         } catch (error) {
-            Logger.error('TwitchClient: Error validating token:', error);
+            Logger.error(`TwitchClient: Error validating ${label} token:`, error);
         }
     }
 
@@ -216,28 +239,29 @@ export class TwitchClient {
         });
         await this.subscribe('channel.subscribe', '1', {
             broadcaster_user_id: this.channelId
-        });
+        }, this.broadcasterToken);
         await this.subscribe('channel.raid', '1', {
             to_broadcaster_user_id: this.channelId
         });
         await this.subscribe('channel.cheer', '1', {
             broadcaster_user_id: this.channelId
-        });
+        }, this.broadcasterToken);
         await this.subscribe('channel.channel_points_custom_reward_redemption.add', '1', {
             broadcaster_user_id: this.channelId
-        });
+        }, this.broadcasterToken);
     }
 
     private async subscribe(
         type: string,
         version: string,
-        condition: Record<string, string | null>
+        condition: Record<string, string | null>,
+        token: string = this.accessToken
     ): Promise<void> {
         try {
             const response = await fetch('https://api.twitch.tv/helix/eventsub/subscriptions', {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${this.accessToken}`,
+                    'Authorization': `Bearer ${token}`,
                     'Client-Id': this.clientId,
                     'Content-Type': 'application/json'
                 },
@@ -266,19 +290,23 @@ export class TwitchClient {
         const subType = message.payload.subscription?.type;
         const event = message.payload.event;
 
-        Logger.debug('TwitchClient: Raw event received:', { subscriptionType: subType, event });
+        Logger.info('TwitchClient: Notification received:', { subscriptionType: subType, event });
 
         // Skip own bot messages
         if (
             subType === 'channel.chat.message'
             && event?.['chatter_user_id'] === this.userId
-        ) return;
+        ) {
+            Logger.info('TwitchClient: Skipping own bot message');
+            return;
+        }
 
         const rawEvent: TwitchRawEvent = {
             subscriptionType: subType ?? '',
             event: event ?? {}
         };
 
+        Logger.info('TwitchClient: Routing to EventRouter');
         this.eventRouter.route(rawEvent);
     }
 
