@@ -17,13 +17,7 @@ export class EventRouter extends Handler {
         twitchClient: ITwitchClient | null = null,
         overlayBroadcasterService: IOverlayBroadcaster | null = null
     ) {
-        // Handler.js is still JS — call super with no args and assign manually
-        // to avoid type mismatch between TS params and JS-inferred null defaults
-        super();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (this as any).twitchClient = twitchClient;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (this as any).overlayBroadcasterService = overlayBroadcasterService;
+        super(twitchClient, overlayBroadcasterService);
         this.eventTypes = [];
         this.configs = [];
     }
