@@ -11,30 +11,14 @@ export class Handler {
     }
 
     async executeConfig(config, templateData) {
-        Logger.debug('Handler: Executing config:', config);
-        Logger.debug('Handler: Template data:', templateData);
-        
-        // DEBUG: Log the volume field specifically
-        console.log('=== VOLUME DEBUG ===');
-        console.log('config.volume:', config.volume);
-        console.log('typeof config.volume:', typeof config.volume);
-        console.log('config object keys:', Object.keys(config));
-        console.log('==================');
-        
-        // Handle reply messages - delegate to TwitchClient
         if (config.reply && this.twitchClient) {
-            const message = this.processTemplate(config.reply, templateData);
-            Logger.info('Sending chat reply:', message);
-            await this.twitchClient.sendChatMessage(message);
-        } else if (config.reply) {
-            Logger.warn('Would send chat reply (no TwitchClient):', this.processTemplate(config.reply, templateData));
+            await this.twitchClient.sendChatMessage(this.processTemplate(config.reply, templateData));
         }
-        
-        // Handle overlay events - delegate to overlay broadcaster service
+
         if (config.image || config.sound || config.text || config.video) {
             const overlayEvent = {
-                type: 'command',
-                command_name: config.command_name,
+                type: 'event',
+                event_name: config.event_name,
                 image: config.image,
                 sound: config.sound,
                 volume: config.volume,
@@ -44,19 +28,9 @@ export class Handler {
                 transition_out: config.transition_out,
                 timeout: config.timeout
             };
-            
-            // DEBUG: Log overlay event details
-            console.log('=== OVERLAY EVENT DEBUG ===');
-            console.log('overlayEvent.volume:', overlayEvent.volume);
-            console.log('overlayEvent keys:', Object.keys(overlayEvent));
-            console.log('Full overlayEvent:', JSON.stringify(overlayEvent, null, 2));
-            console.log('==========================');
-            
-            Logger.info('Sending overlay event:', overlayEvent);
+
             if (this.overlayBroadcasterService) {
                 await this.overlayBroadcasterService.broadcast(overlayEvent);
-            } else {
-                Logger.warn('Would send overlay event (no broadcaster service):', overlayEvent);
             }
         }
     }
