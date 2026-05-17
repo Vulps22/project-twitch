@@ -3,7 +3,7 @@ import type { EventConfig } from '../src/types.js';
 export const EVENTS: Record<string, EventConfig> = {
     lurk: {
         event_name: 'lurk',
-        event_type: 'chat_command',
+        event_type: 'channel_points_redemption',
         trigger_on: ['lurk'],
         image: 'lurk.png',
         sound: 'lurk.mp3',
