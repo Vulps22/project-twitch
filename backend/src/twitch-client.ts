@@ -315,6 +315,15 @@ export class TwitchClient {
             return false;
         }
     }
+    getStatus(): { bot: { connected: boolean }; broadcaster: { connected: boolean; configured: boolean } } {
+        return {
+            bot: { connected: this.botSession.isConnected() },
+            broadcaster: {
+                connected: this.broadcasterSession?.isConnected() ?? false,
+                configured: !!this.broadcasterToken,
+            },
+        };
+    }
 }
 
 export default TwitchClient;

@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 
 import 'dotenv/config';
+import { type Request, type Response } from 'express';
 import { TwitchClient } from './src/twitch-client.js';
 import { EventRouter } from './src/EventRouter.js';
 import OverlayBroadcasterService from './src/services/OverlayBroadcasterService.js';
 import { EVENTS } from './config/events.js';
 import Logger from './src/utils/Logger.js';
-import { wss } from './src/server.js';
+import { wss, app } from './src/server.js';
 
 Logger.info('Starting Twitch project backend...');
 
@@ -40,5 +41,16 @@ try {
 } catch (error) {
     Logger.error('Failed to initialise services:', error instanceof Error ? error.message : String(error));
 }
+
+app.get('/api/status', (_req: Request, res: Response) => {
+    const twitchStatus = twitchClient?.getStatus() ?? {
+        bot: { connected: false },
+        broadcaster: { connected: false, configured: !!process.env.TWITCH_BROADCASTER_TOKEN },
+    };
+    res.json({
+        overlay: { connected: wss.clients.size > 0, clientCount: wss.clients.size },
+        ...twitchStatus,
+    });
+});
 
 export { twitchClient, overlayBroadcasterService, eventRouter };
