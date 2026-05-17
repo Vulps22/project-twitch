@@ -17,6 +17,7 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc",
+    "build:frontend": "cd frontend && npm run build",
     "start": "npm run build && node dist/backend/index.js",
     "dev": "tsx --watch backend/index.ts",
     "start-fail": "node dist/backend/index.js",
