@@ -227,6 +227,10 @@ export class TwitchClient {
         await this.subscribe('channel.channel_points_custom_reward_redemption.add', '1', {
             broadcaster_user_id: this.channelId
         }, this.broadcasterToken, sessionId);
+
+        await this.subscribe('channel.stream.online', '1', {
+            broadcaster_user_id: this.channelId
+        }, this.broadcasterToken, sessionId);
     }
 
     private async subscribe(

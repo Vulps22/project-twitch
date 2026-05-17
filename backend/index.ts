@@ -44,19 +44,14 @@ try {
 }
 
 app.get('/api/stream/stats', async (_req: Request, res: Response) => {
-    if (!twitchClient) {
-        res.json(null);
-        return;
-    }
-    const [stream, followers, subscribers] = await Promise.all([
-        twitchClient.getStreamInfo(),
-        twitchClient.getFollowerCount(),
-        twitchClient.getSubscriberCount(),
-    ]);
-    if (!stream) {
-        res.json(null);
-        return;
-    }
+    const [stream, followers, subscribers] = twitchClient
+        ? await Promise.all([
+            twitchClient.getStreamInfo(),
+            twitchClient.getFollowerCount(),
+            twitchClient.getSubscriberCount(),
+        ])
+        : [null, null, null];
+
     res.json({ stream, followers, subscribers, session: sessionStats.snapshot() });
 });
 

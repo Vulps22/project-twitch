@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 interface StreamStats {
-  stream: { title: string; viewerCount: number; startedAt: string };
+  stream: { title: string; viewerCount: number; startedAt: string } | null;
   followers: number | null;
   subscribers: number | null;
   session: {
@@ -20,9 +20,9 @@ function useStreamStats() {
   useEffect(() => {
     const fetchStats = () =>
       fetch('/api/stream/stats')
-        .then(r => r.json() as Promise<StreamStats | null>)
+        .then(r => r.json() as Promise<StreamStats>)
         .then(setStats)
-        .catch(() => setStats(null));
+        .catch(() => {});
 
     fetchStats();
     const id = setInterval(fetchStats, 30_000);
@@ -39,41 +39,49 @@ function uptime(startedAt: string): string {
   return `${h}h ${m}m`;
 }
 
+function fmt(n: number | null): string {
+  return n === null ? '—' : n.toLocaleString();
+}
+
+function delta(n: number, label: string): string | null {
+  return n > 0 ? `+${n} ${label}` : null;
+}
+
 export default function StreamStatsPanel() {
   const stats = useStreamStats();
 
-  if (!stats) return null;
+  const session = stats?.session ?? { follows: 0, subs: 0, bits: 0, chatMessages: 0, eventsFired: 0, raids: 0 };
 
-  const cards: { label: string; value: string | number; sub?: string; color?: string }[] = [
-    { label: 'Viewers',    value: stats.stream.viewerCount,                          color: 'var(--accent)' },
-    { label: 'Followers',  value: stats.followers ?? '—', sub: `+${stats.session.follows} this stream`, color: 'var(--green)' },
-    { label: 'Subscribers',value: stats.subscribers ?? '—', sub: `+${stats.session.subs} this stream`,  color: 'var(--accent)' },
-    { label: 'Bits cheered',value: stats.session.bits.toLocaleString(), sub: 'this stream',              color: 'var(--gold)' },
-    { label: 'Chat msgs',  value: stats.session.chatMessages.toLocaleString(),        color: undefined },
-    { label: 'Events fired',value: stats.session.eventsFired,                         color: undefined },
-    { label: 'Raids',      value: stats.session.raids,                                color: undefined },
+  const cards: { label: string; value: string; sub?: string | null; color?: string }[] = [
+    { label: 'Viewers',     value: stats?.stream ? fmt(stats.stream.viewerCount) : '—', color: 'var(--accent)' },
+    { label: 'Followers',   value: fmt(stats?.followers ?? null), sub: delta(session.follows, 'this stream'), color: 'var(--green)' },
+    { label: 'Subscribers', value: fmt(stats?.subscribers ?? null), sub: delta(session.subs, 'this stream'),  color: 'var(--accent)' },
+    { label: 'Bits cheered',value: fmt(session.bits),  sub: delta(session.bits, 'this stream'),              color: 'var(--gold)' },
+    { label: 'Chat msgs',   value: fmt(session.chatMessages) },
+    { label: 'Events fired',value: fmt(session.eventsFired) },
+    { label: 'Raids',       value: fmt(session.raids) },
   ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Title bar */}
-      <div style={{
-        background: 'var(--surface)',
-        border: '1px solid var(--border)',
-        borderRadius: 8,
-        padding: '16px 20px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 16,
-      }}>
-        <LiveBadge />
-        <span style={{ fontSize: 15, fontWeight: 600, flex: 1 }}>{stats.stream.title}</span>
-        <span style={{ fontSize: 13, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
-          {uptime(stats.stream.startedAt)}
-        </span>
-      </div>
+      {stats?.stream && (
+        <div style={{
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 8,
+          padding: '16px 20px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 16,
+        }}>
+          <LiveBadge />
+          <span style={{ fontSize: 15, fontWeight: 600, flex: 1 }}>{stats.stream.title}</span>
+          <span style={{ fontSize: 13, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+            {uptime(stats.stream.startedAt)}
+          </span>
+        </div>
+      )}
 
-      {/* Stat cards */}
       <div>
         <div style={{ marginBottom: 12 }}>
           <span className="section-title">Stream Stats</span>
