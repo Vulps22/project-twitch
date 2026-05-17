@@ -1,4 +1,42 @@
+import { useEffect, useState } from 'react';
+
+interface Status {
+  overlay: { connected: boolean; clientCount: number };
+  bot: { connected: boolean };
+  broadcaster: { connected: boolean; configured: boolean };
+}
+
+const POLL_INTERVAL = 3000;
+
+async function fetchStatus(): Promise<Status | null> {
+  try {
+    const res = await fetch('/api/status');
+    if (!res.ok) return null;
+    return res.json() as Promise<Status>;
+  } catch {
+    return null;
+  }
+}
+
 export default function Header() {
+  const [status, setStatus] = useState<Status | null>(null);
+
+  useEffect(() => {
+    fetchStatus().then(setStatus);
+    const id = setInterval(() => fetchStatus().then(setStatus), POLL_INTERVAL);
+    return () => clearInterval(id);
+  }, []);
+
+  const overlayState = status?.overlay.connected ? 'connected' : 'disconnected';
+
+  let twitchChatState: 'connected' | 'warning' | 'disconnected' = 'disconnected';
+  if (status?.bot.connected) twitchChatState = 'connected';
+
+  let twitchEventsState: 'connected' | 'warning' | 'disconnected' = 'disconnected';
+  if (status?.broadcaster.connected) twitchEventsState = 'connected';
+  else if (status && !status.broadcaster.configured) twitchEventsState = 'disconnected';
+  else if (status?.broadcaster.configured) twitchEventsState = 'warning';
+
   return (
     <header style={{
       background: 'var(--surface)',
@@ -14,8 +52,9 @@ export default function Header() {
         StreamerCommander
       </span>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <StatusPill label="Overlay" state="disconnected" />
-        <StatusPill label="Twitch" state="disconnected" />
+        <StatusPill state={overlayState} label="Overlay" />
+        <StatusPill state={twitchChatState} label="Twitch Chat" />
+        <StatusPill state={twitchEventsState} label="Twitch Events" />
       </div>
     </header>
   );
