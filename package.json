@@ -19,7 +19,7 @@
     "build": "tsc",
     "build:frontend": "cd frontend && npm run build",
     "start": "npm run build && node dist/backend/index.js",
-    "dev": "concurrently -n backend,ui -c cyan,magenta \"tsx --watch backend/index.ts\" \"cd frontend && vite\"",
+    "dev": "concurrently -n backend,ui -c cyan,magenta \"tsx --watch backend/index.ts\" \"cd frontend && vite build --watch\"",
     "start-fail": "node dist/backend/index.js",
     "auth:bot": "tsx auth.ts bot",
     "auth:streamer": "tsx auth.ts streamer",
