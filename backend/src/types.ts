@@ -42,5 +42,5 @@ export interface IOverlayBroadcaster {
 }
 
 export interface IEventRouter {
-    route(rawEvent: TwitchRawEvent): Promise<void>
+    route(rawEvent: TwitchRawEvent, replay?: boolean): Promise<void>
 }
