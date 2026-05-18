@@ -7,6 +7,7 @@ import { EventRouter } from './src/EventRouter.js';
 import OverlayBroadcasterService from './src/services/OverlayBroadcasterService.js';
 import { EVENTS } from './config/events.js';
 import Logger from './src/utils/Logger.js';
+import sessionStats from './src/SessionStats.js';
 import { wss, app } from './src/server.js';
 
 Logger.info('Starting Twitch project backend...');
@@ -41,6 +42,18 @@ try {
 } catch (error) {
     Logger.error('Failed to initialise services:', error instanceof Error ? error.message : String(error));
 }
+
+app.get('/api/stream/stats', async (_req: Request, res: Response) => {
+    const [stream, followers, subscribers] = twitchClient
+        ? await Promise.all([
+            twitchClient.getStreamInfo(),
+            twitchClient.getFollowerCount(),
+            twitchClient.getSubscriberCount(),
+        ])
+        : [null, null, null];
+
+    res.json({ stream, followers, subscribers, session: sessionStats.snapshot() });
+});
 
 app.get('/api/status', (_req: Request, res: Response) => {
     const twitchStatus = twitchClient?.getStatus() ?? {

@@ -6,6 +6,7 @@ import { Handler } from './base/Handler.js';
 import { BaseEventType } from './event-types/BaseEventType.js';
 import Logger from './utils/Logger.js';
 import type { EventConfig, TwitchRawEvent, TemplateData, ITwitchClient, IOverlayBroadcaster } from './types.js';
+import sessionStats from './SessionStats.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -34,6 +35,7 @@ export class EventRouter extends Handler {
 
     async route(rawEvent: TwitchRawEvent): Promise<void> {
         Logger.info(`EventRouter: Routing "${rawEvent.subscriptionType}"`);
+        sessionStats.recordEvent(rawEvent.subscriptionType, rawEvent.event);
         let matched = false;
         for (const eventType of this.eventTypes) {
             for (const config of this.configs) {

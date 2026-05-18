@@ -1,3 +1,5 @@
+import StreamStatsPanel from '../components/StreamStatsPanel.tsx';
+
 export default function DashboardPage() {
   return (
     <div style={{
@@ -7,12 +9,11 @@ export default function DashboardPage() {
       alignItems: 'start',
     }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-        {/* Stream stats, viewers panel added in subsequent issues */}
-        <Placeholder label="Stream stats" />
+        <StreamStatsPanel />
         <Placeholder label="Viewers" />
       </div>
 
-      {/* Log sidebar — hidden until live (#64) */}
+      {/* Log sidebar — shown when live (#64) */}
       <aside style={{ display: 'none' }}>
         <Placeholder label="Events log" />
       </aside>

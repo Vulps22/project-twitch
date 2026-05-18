@@ -19,7 +19,7 @@
     "build": "tsc",
     "build:frontend": "cd frontend && npm run build",
     "start": "npm run build && node dist/backend/index.js",
-    "dev": "concurrently -n backend,ui -c cyan,magenta \"tsx --watch backend/index.ts\" \"cd frontend && vite build --watch\"",
+    "dev": "rm -rf dist/dashboard && npm run build:frontend && tsx backend/index.ts",
     "start-fail": "node dist/backend/index.js",
     "auth:bot": "tsx auth.ts bot",
     "auth:streamer": "tsx auth.ts streamer",
@@ -39,7 +39,6 @@
     "@types/express": "^5.0.6",
     "@types/node": "^25.8.0",
     "@types/ws": "^8.18.1",
-    "concurrently": "^9.2.1",
     "tsx": "^4.22.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.6"

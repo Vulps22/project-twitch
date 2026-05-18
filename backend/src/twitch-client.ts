@@ -227,6 +227,10 @@ export class TwitchClient {
         await this.subscribe('channel.channel_points_custom_reward_redemption.add', '1', {
             broadcaster_user_id: this.channelId
         }, this.broadcasterToken, sessionId);
+
+        await this.subscribe('channel.stream.online', '1', {
+            broadcaster_user_id: this.channelId
+        }, this.broadcasterToken, sessionId);
     }
 
     private async subscribe(
@@ -315,6 +319,41 @@ export class TwitchClient {
             return false;
         }
     }
+    async getStreamInfo(): Promise<{ title: string; viewerCount: number; startedAt: string } | null> {
+        if (!this.channelId) return null;
+        try {
+            const res = await fetch(`https://api.twitch.tv/helix/streams?user_id=${this.channelId}`, {
+                headers: { 'Client-Id': this.clientId, 'Authorization': `Bearer ${this.accessToken}` },
+            });
+            const data = await res.json() as { data: { title: string; viewer_count: number; started_at: string }[] };
+            if (!data.data[0]) return null;
+            const s = data.data[0];
+            return { title: s.title, viewerCount: s.viewer_count, startedAt: s.started_at };
+        } catch { return null; }
+    }
+
+    async getFollowerCount(): Promise<number | null> {
+        if (!this.channelId) return null;
+        try {
+            const res = await fetch(`https://api.twitch.tv/helix/channels/followers?broadcaster_id=${this.channelId}`, {
+                headers: { 'Client-Id': this.clientId, 'Authorization': `Bearer ${this.accessToken}` },
+            });
+            const data = await res.json() as { total: number };
+            return data.total ?? null;
+        } catch { return null; }
+    }
+
+    async getSubscriberCount(): Promise<number | null> {
+        if (!this.channelId || !this.broadcasterToken) return null;
+        try {
+            const res = await fetch(`https://api.twitch.tv/helix/subscriptions?broadcaster_id=${this.channelId}`, {
+                headers: { 'Client-Id': this.clientId, 'Authorization': `Bearer ${this.broadcasterToken}` },
+            });
+            const data = await res.json() as { total: number };
+            return data.total ?? null;
+        } catch { return null; }
+    }
+
     getStatus(): { bot: { connected: boolean }; broadcaster: { connected: boolean; configured: boolean } } {
         return {
             bot: { connected: this.botSession.isConnected() },
