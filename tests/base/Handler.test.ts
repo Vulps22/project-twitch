@@ -2,9 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Handler } from '../../backend/src/base/Handler.js'
 import type { ITwitchClient, IOverlayBroadcaster, EventConfig } from '../../backend/src/types.js'
 
+vi.mock('../../backend/src/utils/Logger.js', () => ({
+    default: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn(), log: vi.fn() },
+}))
+
 const baseConfig: EventConfig = {
     event_name: 'test_event',
     event_type: 'chat_command',
+    reactions: [],
 }
 
 describe('Handler.processTemplate', () => {
@@ -44,69 +49,122 @@ describe('Handler.executeConfig', () => {
     let handler: Handler
 
     beforeEach(() => {
-        mockTwitchClient = { sendChatMessage: vi.fn().mockResolvedValue(undefined) }
-        mockOverlay = { broadcast: vi.fn().mockResolvedValue(undefined) }
+        mockTwitchClient = { sendChatMessage: vi.fn().mockResolvedValue(true) }
+        mockOverlay = { broadcast: vi.fn().mockResolvedValue(true) }
         handler = new Handler(mockTwitchClient, mockOverlay)
     })
 
-    it('sends a chat reply when config.reply is set', async () => {
-        await handler.executeConfig({ ...baseConfig, reply: 'Hello {{username}}!' }, { username: 'Bob' })
+    it('sends a chat reply when a chat_reply reaction is present', async () => {
+        await handler.executeConfig({
+            ...baseConfig,
+            reactions: [{ type: 'chat_reply', message: 'Hello {{username}}!' }],
+        }, { username: 'Bob' })
         expect(mockTwitchClient.sendChatMessage).toHaveBeenCalledWith('Hello Bob!')
     })
 
     it('does not send a chat reply when twitchClient is null', async () => {
         const h = new Handler(null, mockOverlay)
-        await h.executeConfig({ ...baseConfig, reply: 'Hello!' }, {})
+        await h.executeConfig({
+            ...baseConfig,
+            reactions: [{ type: 'chat_reply', message: 'Hello!' }],
+        }, {})
         expect(mockTwitchClient.sendChatMessage).not.toHaveBeenCalled()
     })
 
-    it('broadcasts an overlay event when config.image is set', async () => {
-        await handler.executeConfig({ ...baseConfig, image: 'alert.png' }, {})
+    it('broadcasts an overlay event when an image reaction is present', async () => {
+        await handler.executeConfig({
+            ...baseConfig,
+            reactions: [{ type: 'image', url: 'alert.png' }],
+        }, {})
         expect(mockOverlay.broadcast).toHaveBeenCalledWith(expect.objectContaining({
             type: 'event',
             event_name: 'test_event',
-            image: 'alert.png'
+            reactions: expect.arrayContaining([
+                expect.objectContaining({ type: 'image', url: 'alert.png' })
+            ]),
         }))
     })
 
-    it('broadcasts when config.sound is set', async () => {
-        await handler.executeConfig({ ...baseConfig, sound: 'alert.mp3' }, {})
+    it('broadcasts when a sound reaction is present', async () => {
+        await handler.executeConfig({
+            ...baseConfig,
+            reactions: [{ type: 'sound', filename: 'alert.mp3' }],
+        }, {})
         expect(mockOverlay.broadcast).toHaveBeenCalled()
     })
 
-    it('does not broadcast when no media fields are set', async () => {
-        await handler.executeConfig({ ...baseConfig, reply: 'hi' }, {})
+    it('does not broadcast when reactions list is empty', async () => {
+        await handler.executeConfig({ ...baseConfig, reactions: [] }, {})
+        expect(mockOverlay.broadcast).not.toHaveBeenCalled()
+    })
+
+    it('does not broadcast when all reactions are chat_reply', async () => {
+        await handler.executeConfig({
+            ...baseConfig,
+            reactions: [{ type: 'chat_reply', message: 'hi' }],
+        }, {})
         expect(mockOverlay.broadcast).not.toHaveBeenCalled()
     })
 
     it('does not broadcast when overlayBroadcasterService is null', async () => {
         const h = new Handler(mockTwitchClient, null)
-        await h.executeConfig({ ...baseConfig, image: 'alert.png' }, {})
+        await h.executeConfig({
+            ...baseConfig,
+            reactions: [{ type: 'image', url: 'alert.png' }],
+        }, {})
         expect(mockOverlay.broadcast).not.toHaveBeenCalled()
     })
 
-    it('processes template tokens in the overlay text field', async () => {
-        await handler.executeConfig({ ...baseConfig, image: 'x.png', text: '{{username}} arrived!' }, { username: 'Eve' })
+    it('processes template tokens in the overlay_text reaction', async () => {
+        await handler.executeConfig({
+            ...baseConfig,
+            reactions: [
+                { type: 'image', url: 'x.png' },
+                { type: 'overlay_text', text: '{{username}} arrived!' },
+            ],
+        }, { username: 'Eve' })
         expect(mockOverlay.broadcast).toHaveBeenCalledWith(expect.objectContaining({
-            text: 'Eve arrived!'
+            reactions: expect.arrayContaining([
+                expect.objectContaining({ type: 'overlay_text', text: 'Eve arrived!' }),
+            ]),
         }))
+    })
+
+    it('broadcasts all non-chat reactions together in one event', async () => {
+        await handler.executeConfig({
+            ...baseConfig,
+            reactions: [
+                { type: 'chat_reply', message: 'hi' },
+                { type: 'image', url: 'img.png' },
+                { type: 'sound', filename: 'snd.mp3' },
+            ],
+        }, {})
+        expect(mockOverlay.broadcast).toHaveBeenCalledTimes(1)
+        const call = (mockOverlay.broadcast as ReturnType<typeof vi.fn>).mock.calls[0][0]
+        expect(call.reactions).toHaveLength(2)
     })
 })
 
 describe('Handler.setTwitchClient / setOverlayBroadcasterService', () => {
     it('allows late injection of twitchClient', async () => {
         const handler = new Handler()
-        const client: ITwitchClient = { sendChatMessage: vi.fn().mockResolvedValue(undefined) }
+        const client: ITwitchClient = { sendChatMessage: vi.fn().mockResolvedValue(true) }
         handler.setTwitchClient(client)
-        await handler.executeConfig({ ...baseConfig, reply: 'Hi!' }, {})
+        await handler.executeConfig({
+            ...baseConfig,
+            reactions: [{ type: 'chat_reply', message: 'Hi!' }],
+        }, {})
         expect(client.sendChatMessage).toHaveBeenCalledWith('Hi!')
     })
 
     it('allows late injection of overlayBroadcasterService', async () => {
         const handler = new Handler()
-        const overlay: IOverlayBroadcaster = { broadcast: vi.fn().mockResolvedValue(undefined) }
+        const overlay: IOverlayBroadcaster = { broadcast: vi.fn().mockResolvedValue(true) }
         handler.setOverlayBroadcasterService(overlay)
-        await handler.executeConfig({ ...baseConfig, image: 'x.png' }, {})
+        await handler.executeConfig({
+            ...baseConfig,
+            reactions: [{ type: 'image', url: 'x.png' }],
+        }, {})
         expect(overlay.broadcast).toHaveBeenCalled()
     })
 })
