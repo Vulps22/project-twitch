@@ -16,9 +16,18 @@ function formatWatchTime(seconds: number): string {
     return rem > 0 ? `${hrs}h ${rem}m` : `${hrs}h`;
 }
 
+// Pentatonic scale across two octaves — any combination sounds pleasant
+const PENTATONIC_HZ = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25, 784.00, 880.00];
+
+function userFrequency(userId: string): number {
+    let hash = 0;
+    for (const ch of userId) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+    return PENTATONIC_HZ[hash % PENTATONIC_HZ.length];
+}
+
 let sharedAudioCtx: AudioContext | null = null;
 
-function playBeep(): void {
+function playBeep(userId: string): void {
     try {
         sharedAudioCtx ??= new AudioContext();
         void sharedAudioCtx.resume().then(() => {
@@ -27,7 +36,7 @@ function playBeep(): void {
             const gain = ctx.createGain();
             osc.connect(gain);
             gain.connect(ctx.destination);
-            osc.frequency.value = 880;
+            osc.frequency.value = userFrequency(userId);
             gain.gain.setValueAtTime(0.08, ctx.currentTime);
             gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
             osc.start();
@@ -59,7 +68,7 @@ export default function ViewersPanel() {
         if (!flash || flash === prevFlash.current) return;
         prevFlash.current = flash;
 
-        playBeep();
+        playBeep(flash.userId);
 
         setFlashing(prev => new Set(prev).add(flash.userId));
         const timeout = setTimeout(() => {
