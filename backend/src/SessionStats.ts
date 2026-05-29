@@ -29,6 +29,9 @@ class SessionStats {
             case 'channel.raid':         this.raids++;     break;
             case 'channel.chat.message': this.chatMessages++; break;
         }
+    }
+
+    recordEventFired(): void {
         this.eventsFired++;
     }
 

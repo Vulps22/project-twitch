@@ -90,7 +90,9 @@ export class EventRouter extends Handler {
             }
         }
 
-        if (!matched) {
+        if (matched) {
+            sessionStats.recordEventFired();
+        } else {
             Logger.info(`EventRouter: No match for "${rawEvent.subscriptionType}"`);
         }
     }

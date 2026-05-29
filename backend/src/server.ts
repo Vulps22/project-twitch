@@ -12,8 +12,19 @@ const app: Express = express();
 const PORT = 3001;
 
 const server: Server = createServer(app);
-const wss = new WebSocketServer({ server, path: '/ws/overlay' });
-const dashboardWss = new WebSocketServer({ server, path: '/ws/dashboard' });
+const wss = new WebSocketServer({ noServer: true });
+const dashboardWss = new WebSocketServer({ noServer: true });
+
+server.on('upgrade', (req, socket, head) => {
+    const pathname = req.url?.split('?')[0];
+    if (pathname === '/ws/overlay') {
+        wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
+    } else if (pathname === '/ws/dashboard') {
+        dashboardWss.handleUpgrade(req, socket, head, (ws) => dashboardWss.emit('connection', ws, req));
+    } else {
+        socket.destroy();
+    }
+});
 
 wss.on('connection', (ws) => {
     Logger.info('Overlay connected');

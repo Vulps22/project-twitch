@@ -44,11 +44,11 @@ describe('SessionStats', () => {
             expect(sessionStats.snapshot().chatMessages).toBe(2)
         })
 
-        it('increments eventsFired for every matched event', () => {
+        it('does NOT increment eventsFired — that is done via recordEventFired()', () => {
             sessionStats.recordEvent('channel.follow', {})
             sessionStats.recordEvent('channel.subscribe', {})
             sessionStats.recordEvent('channel.cheer', { bits: 100 })
-            expect(sessionStats.snapshot().eventsFired).toBe(3)
+            expect(sessionStats.snapshot().eventsFired).toBe(0)
         })
 
         it('does NOT increment eventsFired for channel.stream.online', () => {
@@ -80,9 +80,24 @@ describe('SessionStats', () => {
         })
     })
 
+    describe('recordEventFired', () => {
+        it('increments eventsFired', () => {
+            sessionStats.recordEventFired()
+            sessionStats.recordEventFired()
+            expect(sessionStats.snapshot().eventsFired).toBe(2)
+        })
+
+        it('is reset by channel.stream.online', () => {
+            sessionStats.recordEventFired()
+            sessionStats.recordEvent('channel.stream.online', {})
+            expect(sessionStats.snapshot().eventsFired).toBe(0)
+        })
+    })
+
     describe('snapshot', () => {
         it('returns a copy of current counters', () => {
             sessionStats.recordEvent('channel.follow', {})
+            sessionStats.recordEventFired()
             const snap = sessionStats.snapshot()
             expect(snap).toEqual({ follows: 1, subs: 0, bits: 0, chatMessages: 0, eventsFired: 1, raids: 0 })
         })
