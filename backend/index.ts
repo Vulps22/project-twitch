@@ -42,6 +42,7 @@ try {
             eventRouter
         });
 
+        await twitchClient.whenReady();
         eventRouter.setTwitchClient(twitchClient);
         viewerTracker.setTwitchClient(twitchClient);
         void viewerTracker.startPolling();

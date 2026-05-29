@@ -47,6 +47,7 @@ export class TwitchClient {
     private eventRouter: IEventRouter | null;
     private botSession: EventSubSession;
     private broadcasterSession: EventSubSession | null;
+    private initPromise: Promise<void>;
 
     constructor(options: TwitchClientOptions = {}) {
         const accessToken = options.accessToken ?? process.env.TWITCH_ACCESS_TOKEN;
@@ -82,7 +83,11 @@ export class TwitchClient {
             )
             : null;
 
-        this.init();
+        this.initPromise = this.init();
+    }
+
+    whenReady(): Promise<void> {
+        return this.initPromise;
     }
 
     async init(): Promise<void> {
