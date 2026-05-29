@@ -81,6 +81,29 @@ app.get('/api/events', (_req: Request, res: Response) => {
     res.json(eventStorage.getAll());
 });
 
+app.post('/api/events', async (req: Request, res: Response) => {
+    const config = req.body;
+    if (!config?.event_name || !config?.event_type) {
+        res.status(400).json({ error: 'event_name and event_type are required' });
+        return;
+    }
+    const created = await eventStorage.create(config);
+    if (!created) {
+        res.status(409).json({ error: 'Event already exists' });
+        return;
+    }
+    res.status(201).json({ ok: true });
+});
+
+app.put('/api/events/:name', async (req: Request, res: Response) => {
+    const updated = await eventStorage.update(req.params.name, req.body);
+    if (!updated) {
+        res.status(404).json({ error: 'Event not found' });
+        return;
+    }
+    res.json({ ok: true });
+});
+
 app.delete('/api/events/:name', async (req: Request, res: Response) => {
     const deleted = await eventStorage.delete(req.params.name);
     if (!deleted) {
