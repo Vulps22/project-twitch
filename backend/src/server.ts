@@ -12,7 +12,8 @@ const app: Express = express();
 const PORT = 3001;
 
 const server: Server = createServer(app);
-const wss = new WebSocketServer({ server });
+const wss = new WebSocketServer({ server, path: '/ws/overlay' });
+const dashboardWss = new WebSocketServer({ server, path: '/ws/dashboard' });
 
 wss.on('connection', (ws) => {
     Logger.info('Overlay connected');
@@ -26,6 +27,11 @@ wss.on('connection', (ws) => {
     ws.on('close', () => {
         Logger.info('Overlay disconnected');
     });
+});
+
+dashboardWss.on('connection', (ws) => {
+    Logger.info('Dashboard connected');
+    ws.on('close', () => Logger.info('Dashboard disconnected'));
 });
 
 app.use(express.json());
@@ -46,4 +52,4 @@ server.listen(PORT, () => {
     Logger.info(`WebSocket server ready on ws://localhost:${PORT}`);
 });
 
-export { wss, app, server };
+export { wss, dashboardWss, app, server };
