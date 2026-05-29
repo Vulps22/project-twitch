@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { useViewers } from '../hooks/useViewers.ts';
 import { useDashboardSocket } from '../hooks/useDashboardSocket.ts';
+import type { Viewer } from '../hooks/useViewers.ts';
+
+interface ChatFlash {
+    userId: string
+    username: string
+}
 
 function formatWatchTime(seconds: number): string {
     if (seconds < 60) return `${seconds}s`;
@@ -11,28 +16,45 @@ function formatWatchTime(seconds: number): string {
     return rem > 0 ? `${hrs}h ${rem}m` : `${hrs}h`;
 }
 
+let sharedAudioCtx: AudioContext | null = null;
+
 function playBeep(): void {
     try {
-        const ctx = new AudioContext();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.frequency.value = 880;
-        gain.gain.setValueAtTime(0.08, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.12);
-        osc.onended = () => ctx.close();
+        sharedAudioCtx ??= new AudioContext();
+        void sharedAudioCtx.resume().then(() => {
+            const ctx = sharedAudioCtx!;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.frequency.value = 880;
+            gain.gain.setValueAtTime(0.08, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.12);
+        });
     } catch { /* AudioContext unavailable */ }
 }
 
 export default function ViewersPanel() {
-    const viewers = useViewers();
+    const [viewers, setViewers] = useState<Viewer[]>([]);
     const flash = useDashboardSocket();
     const [flashing, setFlashing] = useState<Set<string>>(new Set());
     const prevFlash = useRef<ChatFlash | null>(null);
 
+    // Base poll — syncs the full list from the server
+    useEffect(() => {
+        const load = () =>
+            fetch('/api/viewers')
+                .then(r => r.json() as Promise<Viewer[]>)
+                .then(setViewers)
+                .catch(() => {});
+        load();
+        const id = setInterval(load, 30_000);
+        return () => clearInterval(id);
+    }, []);
+
+    // Real-time update — increment count immediately on WS event
     useEffect(() => {
         if (!flash || flash === prevFlash.current) return;
         prevFlash.current = flash;
@@ -47,6 +69,18 @@ export default function ViewersPanel() {
                 return next;
             });
         }, 2000);
+
+        setViewers(prev => {
+            const exists = prev.some(v => v.userId === flash.userId);
+            if (exists) {
+                return prev.map(v =>
+                    v.userId === flash.userId
+                        ? { ...v, messageCount: v.messageCount + 1 }
+                        : v
+                );
+            }
+            return [...prev, { userId: flash.userId, username: flash.username, watchTime: 0, messageCount: 1 }];
+        });
 
         return () => clearTimeout(timeout);
     }, [flash]);
@@ -92,9 +126,4 @@ export default function ViewersPanel() {
             )}
         </div>
     );
-}
-
-interface ChatFlash {
-    userId: string
-    username: string
 }
