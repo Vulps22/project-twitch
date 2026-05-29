@@ -9,9 +9,12 @@ import { EVENTS } from './config/events.js';
 import Logger from './src/utils/Logger.js';
 import sessionStats from './src/SessionStats.js';
 import eventLog from './src/EventLog.js';
+import eventStorage from './src/EventStorage.js';
 import { wss, app } from './src/server.js';
 
 Logger.info('Starting Twitch project backend...');
+
+await eventStorage.load();
 
 let twitchClient: TwitchClient | null = null;
 let overlayBroadcasterService: OverlayBroadcasterService | null = null;
@@ -71,6 +74,19 @@ app.post('/api/log/:id/replay', async (req: Request, res: Response) => {
         return;
     }
     await eventRouter.route({ subscriptionType: entry.subscriptionType, event: entry.data }, true);
+    res.json({ ok: true });
+});
+
+app.get('/api/events', (_req: Request, res: Response) => {
+    res.json(eventStorage.getAll());
+});
+
+app.delete('/api/events/:name', async (req: Request, res: Response) => {
+    const deleted = await eventStorage.delete(req.params.name);
+    if (!deleted) {
+        res.status(404).json({ error: 'Event not found' });
+        return;
+    }
     res.json({ ok: true });
 });
 

@@ -2,8 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('../backend/src/server.js', () => ({
     wss: { clients: new Set(), on: vi.fn() },
-    app: { get: vi.fn(), post: vi.fn(), use: vi.fn() },
+    app: { get: vi.fn(), post: vi.fn(), delete: vi.fn(), use: vi.fn() },
     server: {}
+}))
+
+vi.mock('../backend/src/EventStorage.js', () => ({
+    default: { load: vi.fn().mockResolvedValue(undefined), getAll: vi.fn().mockReturnValue([]), delete: vi.fn().mockResolvedValue(true) }
 }))
 
 vi.mock('better-sqlite3', () => ({
