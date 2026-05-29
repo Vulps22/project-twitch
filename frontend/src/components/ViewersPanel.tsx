@@ -16,13 +16,17 @@ function formatWatchTime(seconds: number): string {
     return rem > 0 ? `${hrs}h ${rem}m` : `${hrs}h`;
 }
 
-// Pentatonic scale across two octaves — any combination sounds pleasant
-const PENTATONIC_HZ = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25, 784.00, 880.00];
+// 5 pentatonic ratios × 4 octaves = 20 unique pitches, all musically consonant
+const PENTATONIC_RATIOS = [1, 1.125, 1.25, 1.5, 1.667];
+const BASE_FREQ = 130.81; // C3
+const OCTAVES = 4;
 
 function userFrequency(userId: string): number {
     let hash = 0;
     for (const ch of userId) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
-    return PENTATONIC_HZ[hash % PENTATONIC_HZ.length];
+    const note   = hash % PENTATONIC_RATIOS.length;
+    const octave = (hash >>> 8) % OCTAVES;
+    return BASE_FREQ * PENTATONIC_RATIOS[note] * Math.pow(2, octave);
 }
 
 let sharedAudioCtx: AudioContext | null = null;
