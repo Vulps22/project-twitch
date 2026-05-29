@@ -1,4 +1,5 @@
 import Logger from './utils/Logger.js';
+import eventLog from './EventLog.js';
 
 export interface StatsSnapshot {
     follows: number;
@@ -38,6 +39,7 @@ class SessionStats {
         this.chatMessages = 0;
         this.eventsFired = 0;
         this.raids = 0;
+        eventLog.reset();
         Logger.info('SessionStats: reset for new stream');
     }
 

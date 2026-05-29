@@ -8,6 +8,7 @@ import OverlayBroadcasterService from './src/services/OverlayBroadcasterService.
 import { EVENTS } from './config/events.js';
 import Logger from './src/utils/Logger.js';
 import sessionStats from './src/SessionStats.js';
+import eventLog from './src/EventLog.js';
 import { wss, app } from './src/server.js';
 
 Logger.info('Starting Twitch project backend...');
@@ -53,6 +54,24 @@ app.get('/api/stream/stats', async (_req: Request, res: Response) => {
         : [null, null, null];
 
     res.json({ stream, followers, subscribers, session: sessionStats.snapshot() });
+});
+
+app.get('/api/log', (_req: Request, res: Response) => {
+    res.json(eventLog.getAll());
+});
+
+app.post('/api/log/:id/replay', async (req: Request, res: Response) => {
+    const entry = eventLog.getById(String(req.params.id));
+    if (!entry) {
+        res.status(404).json({ error: 'Log entry not found' });
+        return;
+    }
+    if (!eventRouter) {
+        res.status(503).json({ error: 'Event router not available' });
+        return;
+    }
+    await eventRouter.route({ subscriptionType: entry.subscriptionType, event: entry.data }, true);
+    res.json({ ok: true });
 });
 
 app.get('/api/status', (_req: Request, res: Response) => {

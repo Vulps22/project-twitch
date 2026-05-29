@@ -7,8 +7,35 @@ import { BaseEventType } from './event-types/BaseEventType.js';
 import Logger from './utils/Logger.js';
 import type { EventConfig, TwitchRawEvent, TemplateData, ITwitchClient, IOverlayBroadcaster } from './types.js';
 import sessionStats from './SessionStats.js';
+import eventLog from './EventLog.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+function extractDetail(subscriptionType: string, event: Record<string, unknown>): string {
+    switch (subscriptionType) {
+        case 'channel.follow':
+            return 'Followed the channel';
+        case 'channel.subscribe': {
+            const tier = String(event['tier'] ?? '1000');
+            const tierLabel = tier === '3000' ? 'Tier 3' : tier === '2000' ? 'Tier 2' : 'Tier 1';
+            return `Subscribed (${tierLabel})`;
+        }
+        case 'channel.cheer':
+            return `Cheered ${event['bits'] ?? '?'} bits`;
+        case 'channel.raid':
+            return `Raided with ${event['viewers'] ?? '?'} viewers`;
+        case 'channel.chat.message': {
+            const msg = event['message'] as Record<string, unknown> | undefined;
+            return String(msg?.['text'] ?? '');
+        }
+        case 'channel.channel_points_custom_reward_redemption.add': {
+            const reward = event['reward'] as Record<string, unknown> | undefined;
+            return `Redeemed: ${reward?.['title'] ?? 'Unknown reward'}`;
+        }
+        default:
+            return subscriptionType;
+    }
+}
 
 export class EventRouter extends Handler {
     eventTypes: BaseEventType[];
@@ -33,9 +60,10 @@ export class EventRouter extends Handler {
         Logger.info(`EventRouter: Loaded ${this.configs.length} event configs`);
     }
 
-    async route(rawEvent: TwitchRawEvent): Promise<void> {
-        Logger.info(`EventRouter: Routing "${rawEvent.subscriptionType}"`);
+    async route(rawEvent: TwitchRawEvent, replay = false): Promise<void> {
+        Logger.info(`EventRouter: Routing "${rawEvent.subscriptionType}"${replay ? ' (replay)' : ''}`);
         sessionStats.recordEvent(rawEvent.subscriptionType, rawEvent.event);
+
         let matched = false;
         for (const eventType of this.eventTypes) {
             for (const config of this.configs) {
@@ -43,10 +71,23 @@ export class EventRouter extends Handler {
                     Logger.info(`EventRouter: Matched [${eventType.type}] → "${config.event_name}"`);
                     const templateData: TemplateData = eventType.extractTemplateData(rawEvent);
                     await this.executeConfig(config, templateData);
+
+                    if (!replay) {
+                        eventLog.append({
+                            eventName:        config.event_name,
+                            eventType:        config.event_type,
+                            subscriptionType: rawEvent.subscriptionType,
+                            username:         templateData['username'] ?? templateData['display_name'] ?? 'unknown',
+                            detail:           extractDetail(rawEvent.subscriptionType, rawEvent.event),
+                            data:             rawEvent.event,
+                        });
+                    }
+
                     matched = true;
                 }
             }
         }
+
         if (!matched) {
             Logger.info(`EventRouter: No match for "${rawEvent.subscriptionType}"`);
         }
@@ -57,7 +98,6 @@ export class EventRouter extends Handler {
         const files = await readdir(dir);
 
         for (const file of files) {
-            // Accept .js (compiled) and .ts (tsx dev mode); skip declaration files
             if (file.endsWith('.d.ts')) continue;
             if (!file.endsWith('.js') && !file.endsWith('.ts')) continue;
 

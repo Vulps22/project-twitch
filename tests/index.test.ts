@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('../backend/src/server.js', () => ({
     wss: { clients: new Set(), on: vi.fn() },
-    app: {},
+    app: { get: vi.fn(), post: vi.fn(), use: vi.fn() },
     server: {}
 }))
 
