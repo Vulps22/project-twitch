@@ -41,7 +41,7 @@ function playBeep(userId: string): void {
             osc.connect(gain);
             gain.connect(ctx.destination);
             osc.frequency.value = userFrequency(userId);
-            gain.gain.setValueAtTime(0.08, ctx.currentTime);
+            gain.gain.setValueAtTime(0.2, ctx.currentTime);
             gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
             osc.start();
             osc.stop(ctx.currentTime + 0.5);
