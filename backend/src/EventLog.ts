@@ -10,6 +10,7 @@ export interface LogEntry {
     detail: string;
     timestamp: Date;
     data: Record<string, unknown>;
+    test?: boolean;
 }
 
 const MAX_ENTRIES = 500;

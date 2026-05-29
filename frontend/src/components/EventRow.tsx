@@ -28,6 +28,11 @@ export default function EventRow({ event, onEdit, onDelete }: Props) {
   const badgeColor = TYPE_COLORS[event.event_type] ?? 'var(--muted)';
   const pills = [...new Set(event.reactions.map(r => PILL_LABELS[r.type]).filter(Boolean))];
 
+  function handleTest() {
+    fetch(`/api/events/${encodeURIComponent(event.event_name)}/test`, { method: 'POST' })
+      .catch(() => {});
+  }
+
   function handleDelete() {
     if (!confirm(`Delete "${event.event_name}"?`)) return;
     fetch(`/api/events/${encodeURIComponent(event.event_name)}`, { method: 'DELETE' })
@@ -83,6 +88,7 @@ export default function EventRow({ event, onEdit, onDelete }: Props) {
       </div>
 
       <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+        <button className="btn btn-sm" onClick={handleTest} style={{ background: 'transparent', border: '1px solid var(--cyan)', color: 'var(--cyan)' }}>Test</button>
         <button className="btn btn-ghost btn-sm" onClick={() => onEdit(event)}>Edit</button>
         <button className="btn btn-danger btn-sm" onClick={handleDelete}>Delete</button>
       </div>

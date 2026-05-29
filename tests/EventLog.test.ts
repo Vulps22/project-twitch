@@ -40,6 +40,16 @@ describe('EventLog', () => {
             expect(entry.data).toEqual(data)
         })
 
+        it('stores test flag when provided', () => {
+            eventLog.append(makeEntry({ test: true }))
+            expect(eventLog.getAll()[0].test).toBe(true)
+        })
+
+        it('test flag is absent on normal entries', () => {
+            eventLog.append(makeEntry())
+            expect(eventLog.getAll()[0].test).toBeUndefined()
+        })
+
         it('prepends — newest entry is first', () => {
             eventLog.append(makeEntry({ username: 'first' }))
             eventLog.append(makeEntry({ username: 'second' }))

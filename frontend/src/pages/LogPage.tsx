@@ -7,6 +7,7 @@ interface LogEntry {
   username: string;
   detail: string;
   timestamp: string;
+  test?: boolean;
 }
 
 async function fetchLog(): Promise<LogEntry[]> {
@@ -89,9 +90,16 @@ export default function LogPage() {
                   {formatTime(entry.timestamp)}
                 </td>
                 <td style={{ padding: '10px 16px', borderBottom: i < entries.length - 1 ? '1px solid #1a1a1d' : undefined }}>
-                  <span className={`event-type-badge ${entry.eventType}`}>
-                    {entry.eventType.replace(/_/g, ' ')}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span className={`event-type-badge ${entry.eventType}`}>
+                      {entry.eventType.replace(/_/g, ' ')}
+                    </span>
+                    {entry.test && (
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: 'var(--cyan)22', color: 'var(--cyan)', border: '1px solid var(--cyan)55', letterSpacing: '0.3px' }}>
+                        TEST
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td style={{ padding: '10px 16px', borderBottom: i < entries.length - 1 ? '1px solid #1a1a1d' : undefined }}>
                   {entry.username}

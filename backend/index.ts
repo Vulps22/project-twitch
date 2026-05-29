@@ -77,6 +77,41 @@ app.post('/api/log/:id/replay', async (req: Request, res: Response) => {
     res.json({ ok: true });
 });
 
+app.post('/api/events/:name/test', async (req: Request, res: Response) => {
+    const config = eventStorage.getAll().find(e => e.event_name === req.params.name);
+    if (!config) {
+        res.status(404).json({ error: 'Event not found' });
+        return;
+    }
+    if (!eventRouter) {
+        res.status(503).json({ error: 'Event router not available' });
+        return;
+    }
+
+    const fakeTemplateData = {
+        username:     'test_user',
+        display_name: 'Test User',
+        user_id:      '00000',
+        count:        '1',
+        tier:         '1000',
+        followed_at:  new Date().toISOString(),
+    };
+
+    await eventRouter.executeConfig(config, fakeTemplateData);
+
+    eventLog.append({
+        eventName:        config.event_name,
+        eventType:        config.event_type,
+        subscriptionType: 'test',
+        username:         'test_user',
+        detail:           `Test of "${config.event_name}"`,
+        data:             { test: true },
+        test:             true,
+    });
+
+    res.json({ ok: true });
+});
+
 app.get('/api/events', (_req: Request, res: Response) => {
     res.json(eventStorage.getAll());
 });
