@@ -42,9 +42,9 @@ function playBeep(userId: string): void {
             gain.connect(ctx.destination);
             osc.frequency.value = userFrequency(userId);
             gain.gain.setValueAtTime(0.08, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.62);
             osc.start();
-            osc.stop(ctx.currentTime + 0.12);
+            osc.stop(ctx.currentTime + 0.62);
         });
     } catch { /* AudioContext unavailable */ }
 }
