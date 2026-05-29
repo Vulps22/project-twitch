@@ -21,6 +21,7 @@ function makeConfig(overrides: Partial<EventConfig> = {}): EventConfig {
     return {
         event_name: 'test_event',
         event_type: 'chat_command',
+        reactions: [],
         ...overrides,
     }
 }

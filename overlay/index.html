@@ -207,11 +207,10 @@
                 this.overlayContainer = document.getElementById('overlay-container');
                 this.currentDisplay = null;
                 this.displayTimeout = null;
+                this._transitionOut = 'fade-out';
                 this.reconnectAttempts = 0;
                 this.maxReconnectAttempts = 5;
                 this.reconnectDelay = 1000; // Start with 1 second
-
-                // Media end handling is now done directly in onended callbacks
 
                 this.connect();
             }
@@ -275,9 +274,6 @@
                     case 'connection':
                         console.log('Backend connection confirmed:', data.message);
                         break;
-                    case 'command':
-                        this.displayCommand(data);
-                        break;
                     case 'event':
                         this.displayEvent(data);
                         break;
@@ -289,118 +285,83 @@
                 }
             }
 
-            displayCommand(commandData) {
-
-                const shouldqueue = this.shouldQueue();
-
-                if (shouldqueue) {
-                    this.queuedConfigs.push(commandData);
-                    return;
-                }
-
-                // Clear any existing display
-                this.clearDisplay();
-
-                // Create display element
-                const displayElement = document.createElement('div');
-                displayElement.className = 'command-output';
-
-                // Add content based on what's available
-                let hasContent = false;
-
-                // Add video if specified
-                if (commandData.video) {
-                    const video = document.createElement('video');
-                    video.className = 'command-video';
-                    video.src = `/assets/video/${commandData.video}`;
-                    video.autoplay = true;
-                    video.muted = true; // Muted to allow autoplay in browsers
-                    video.loop = false;
-                    video.controls = false;
-
-                    // Handle video load errors
-                    video.onerror = () => {
-                        console.warn(`Video not found: ${commandData.video}`);
-                    };
-
-                    // Optional: Log when video starts/ends
-                    video.onloadeddata = () => {
-                        console.log(`Video loaded: ${commandData.video}`);
-                        this.playingMedia.push(video);
-                    };
-
-                    video.onended = () => {
-                        console.log(`Video ended: ${commandData.video}`);
-                        this.onMediaEnded(video, 'video', commandData.video);
-                    };
-
-                    displayElement.appendChild(video);
-                    hasContent = true;
-                }
-
-                // Add image if specified (and no video)
-                if (commandData.image && !commandData.video) {
-                    const img = document.createElement('img');
-                    img.className = 'command-image';
-                    img.src = `/assets/img/${commandData.image}`;
-                    img.alt = commandData.command_name || 'Command Image';
-
-                    // Handle image load errors
-                    img.onerror = () => {
-                        console.warn(`Image not found: ${commandData.image}`);
-                        // Optionally, you could fallback to a default image or remove the element
-                    };
-
-                    displayElement.appendChild(img);
-                    hasContent = true;
-                }
-
-                // Add text if specified
-                if (commandData.text && commandData.text.trim()) {
-                    const textDiv = document.createElement('div');
-                    textDiv.className = 'command-text';
-                    textDiv.textContent = commandData.text;
-                    displayElement.appendChild(textDiv);
-                    hasContent = true;
-                }
-
-                // Play sound regardless of visual content
-                if (commandData.sound) {
-                    this.playSound(commandData.sound, commandData.volume);
-                }
-
-                // Only display visual elements if we have content
-                if (hasContent) {
-                    // Add transition classes
-                    if (commandData.transition_in) {
-                        displayElement.classList.add(commandData.transition_in);
-                    }
-
-                    // Add to overlay
-                    this.overlayContainer.appendChild(displayElement);
-                    this.currentDisplay = displayElement;
-
-                    // Set timeout for removal
-                    const timeout = this.parseTimeout(commandData.timeout) || 5000; // Default 5 seconds
-                    this.displayTimeout = setTimeout(() => {
-                        this.hideDisplay(commandData.transition_out);
-                    }, timeout);
-                }
-            }
-
             shouldQueue() {
                 return this.currentDisplay !== null || this.playingMedia.length > 0;
             }
 
-            /**
-             * @deprecated Use displayCommand for command events only.
-             * This method can be extended to handle different event types in the future.
-            **/
             displayEvent(eventData) {
-                // Handle different event types (can be extended for follow, subscribe, etc.)
-                console.log('Displaying event:', eventData);
-                // For now, treat events similar to commands
-                this.displayCommand(eventData);
+                if (this.shouldQueue()) {
+                    this.queuedConfigs.push(eventData);
+                    return;
+                }
+
+                this.clearDisplay();
+
+                const reactions = eventData.reactions || [];
+                const displayElement = document.createElement('div');
+                displayElement.className = 'command-output';
+                let hasVisual = false;
+                let transitionOut = 'fade-out';
+                let timeout = null;
+
+                for (const reaction of reactions) {
+                    switch (reaction.type) {
+                        case 'sound':
+                            this.playSound(reaction.filename, reaction.volume);
+                            break;
+                        case 'image': {
+                            const img = document.createElement('img');
+                            img.className = 'command-image';
+                            img.src = `/assets/img/${reaction.url}`;
+                            img.alt = eventData.event_name || 'Event image';
+                            if (reaction.transition_in) img.classList.add(reaction.transition_in);
+                            img.onerror = () => console.warn(`Image not found: ${reaction.url}`);
+                            displayElement.appendChild(img);
+                            if (reaction.transition_out) transitionOut = reaction.transition_out;
+                            if (reaction.timeout && timeout === null) timeout = this.parseTimeout(reaction.timeout);
+                            hasVisual = true;
+                            break;
+                        }
+                        case 'video': {
+                            const video = document.createElement('video');
+                            video.className = 'command-video';
+                            video.src = `/assets/video/${reaction.filename}`;
+                            video.autoplay = true;
+                            video.muted = true;
+                            video.loop = false;
+                            video.controls = false;
+                            if (reaction.transition_in) video.classList.add(reaction.transition_in);
+                            video.onerror = () => console.warn(`Video not found: ${reaction.filename}`);
+                            video.onloadeddata = () => this.playingMedia.push(video);
+                            video.onended = () => this.onMediaEnded(video, 'video', reaction.filename);
+                            displayElement.appendChild(video);
+                            if (reaction.transition_out) transitionOut = reaction.transition_out;
+                            if (reaction.timeout && timeout === null) timeout = this.parseTimeout(reaction.timeout);
+                            hasVisual = true;
+                            break;
+                        }
+                        case 'overlay_text': {
+                            const textDiv = document.createElement('div');
+                            textDiv.className = 'command-text';
+                            textDiv.textContent = reaction.text;
+                            if (reaction.transition_in) textDiv.classList.add(reaction.transition_in);
+                            displayElement.appendChild(textDiv);
+                            if (reaction.transition_out) transitionOut = reaction.transition_out;
+                            if (reaction.timeout && timeout === null) timeout = this.parseTimeout(reaction.timeout);
+                            hasVisual = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (hasVisual) {
+                    this.overlayContainer.appendChild(displayElement);
+                    this.currentDisplay = displayElement;
+                    this._transitionOut = transitionOut;
+                    this.displayTimeout = setTimeout(() => {
+                        this.hideDisplay(this._transitionOut);
+                    }, timeout !== null ? timeout : 5000);
+                }
             }
 
             hideDisplay(transitionOut = 'fade-out') {
@@ -457,10 +418,9 @@
                 // Remove from playing media array
                 this.playingMedia = this.playingMedia.filter(media => media !== mediaElement);
                 
-                // Process next queued command if any
                 if (this.queuedConfigs.length > 0) {
                     const nextConfig = this.queuedConfigs.shift();
-                    this.displayCommand(nextConfig);
+                    this.displayEvent(nextConfig);
                 }
             }
 

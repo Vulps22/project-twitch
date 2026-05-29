@@ -1,16 +1,52 @@
+export interface ChatReplyReaction {
+    type: 'chat_reply'
+    message: string
+}
+
+export interface OverlayTextReaction {
+    type: 'overlay_text'
+    text: string
+    transition_in?: string
+    transition_out?: string
+    timeout?: string
+}
+
+export interface ImageReaction {
+    type: 'image'
+    url: string
+    offsetX?: number
+    offsetY?: number
+    offsetZ?: number
+    transition_in?: string
+    transition_out?: string
+    timeout?: string
+}
+
+export interface SoundReaction {
+    type: 'sound'
+    filename: string
+    volume?: number
+}
+
+export interface VideoReaction {
+    type: 'video'
+    filename: string
+    offsetX?: number
+    offsetY?: number
+    offsetZ?: number
+    transition_in?: string
+    transition_out?: string
+    timeout?: string
+}
+
+export type OverlayReaction = OverlayTextReaction | ImageReaction | SoundReaction | VideoReaction
+export type Reaction = ChatReplyReaction | OverlayReaction
+
 export interface EventConfig {
     event_name: string
     event_type: string
     trigger_on?: string[]
-    reply?: string
-    image?: string
-    sound?: string
-    volume?: number
-    video?: string
-    text?: string
-    transition_in?: string
-    transition_out?: string
-    timeout?: string
+    reactions: Reaction[]
 }
 
 export type TemplateData = Record<string, string>
@@ -23,14 +59,7 @@ export interface TwitchRawEvent {
 export interface OverlayEvent {
     type: 'event'
     event_name: string
-    image?: string
-    sound?: string
-    volume?: number
-    video?: string
-    text?: string
-    transition_in?: string
-    transition_out?: string
-    timeout?: string
+    reactions: OverlayReaction[]
 }
 
 export interface ITwitchClient {
