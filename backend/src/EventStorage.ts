@@ -28,6 +28,22 @@ export class EventStorage {
         return Object.values(this.events);
     }
 
+    async create(config: EventConfig): Promise<boolean> {
+        this.assertLoaded();
+        if (config.event_name in this.events) return false;
+        this.events[config.event_name] = config;
+        await this.persist();
+        return true;
+    }
+
+    async update(name: string, config: EventConfig): Promise<boolean> {
+        this.assertLoaded();
+        if (!(name in this.events)) return false;
+        this.events[name] = config;
+        await this.persist();
+        return true;
+    }
+
     async delete(name: string): Promise<boolean> {
         this.assertLoaded();
         if (!(name in this.events)) return false;

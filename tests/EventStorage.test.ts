@@ -97,4 +97,59 @@ describe('EventStorage', () => {
         const storage = await freshStorage()
         expect(() => storage.getAll()).toThrow('load()')
     })
+
+    describe('create', () => {
+        it('adds a new event and returns true', async () => {
+            const storage = await freshStorage()
+            await storage.load()
+            const newEvent = { event_name: 'hype', event_type: 'chat_command', trigger_on: ['hype'], reactions: [] }
+            const result = await storage.create(newEvent)
+            expect(result).toBe(true)
+            expect(storage.getAll().map(e => e.event_name)).toContain('hype')
+        })
+
+        it('returns false when event name already exists', async () => {
+            const storage = await freshStorage()
+            await storage.load()
+            const duplicate = { event_name: 'lurk', event_type: 'chat_command', reactions: [] }
+            const result = await storage.create(duplicate)
+            expect(result).toBe(false)
+        })
+
+        it('persists new event to disk', async () => {
+            const { writeFile } = await import('fs/promises')
+            const storage = await freshStorage()
+            await storage.load()
+            vi.clearAllMocks()
+            await storage.create({ event_name: 'hype', event_type: 'chat_command', reactions: [] })
+            expect(writeFile).toHaveBeenCalled()
+        })
+    })
+
+    describe('update', () => {
+        it('updates an existing event and returns true', async () => {
+            const storage = await freshStorage()
+            await storage.load()
+            const updated = { event_name: 'lurk', event_type: 'follow', reactions: [] }
+            const result = await storage.update('lurk', updated)
+            expect(result).toBe(true)
+            expect(storage.getAll().find(e => e.event_name === 'lurk')?.event_type).toBe('follow')
+        })
+
+        it('returns false for unknown event', async () => {
+            const storage = await freshStorage()
+            await storage.load()
+            const result = await storage.update('nonexistent', { event_name: 'nonexistent', event_type: 'follow', reactions: [] })
+            expect(result).toBe(false)
+        })
+
+        it('persists updated event to disk', async () => {
+            const { writeFile } = await import('fs/promises')
+            const storage = await freshStorage()
+            await storage.load()
+            vi.clearAllMocks()
+            await storage.update('lurk', { event_name: 'lurk', event_type: 'follow', reactions: [] })
+            expect(writeFile).toHaveBeenCalled()
+        })
+    })
 })

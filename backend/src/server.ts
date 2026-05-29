@@ -28,6 +28,7 @@ wss.on('connection', (ws) => {
     });
 });
 
+app.use(express.json());
 app.use('/overlay', express.static(join(__dirname, '../../overlay')));
 app.use('/assets', express.static(join(__dirname, '../../assets')));
 app.use('/dashboard', express.static(join(__dirname, '../../dist/dashboard')));

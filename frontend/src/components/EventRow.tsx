@@ -20,10 +20,11 @@ const PILL_LABELS: Partial<Record<Reaction['type'], string>> = {
 
 interface Props {
   event: EventConfig;
+  onEdit: (event: EventConfig) => void;
   onDelete: (name: string) => void;
 }
 
-export default function EventRow({ event, onDelete }: Props) {
+export default function EventRow({ event, onEdit, onDelete }: Props) {
   const badgeColor = TYPE_COLORS[event.event_type] ?? 'var(--muted)';
   const pills = [...new Set(event.reactions.map(r => PILL_LABELS[r.type]).filter(Boolean))];
 
@@ -82,7 +83,7 @@ export default function EventRow({ event, onDelete }: Props) {
       </div>
 
       <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-        <button className="btn btn-ghost btn-sm" disabled title="Coming in #69">Edit</button>
+        <button className="btn btn-ghost btn-sm" onClick={() => onEdit(event)}>Edit</button>
         <button className="btn btn-danger btn-sm" onClick={handleDelete}>Delete</button>
       </div>
     </div>

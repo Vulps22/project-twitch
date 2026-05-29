@@ -14,8 +14,9 @@ vi.mock('http', () => ({
 
 vi.mock('express', () => {
     const app = { use: vi.fn(), get: vi.fn() }
-    const fn = vi.fn(() => app) as unknown as typeof import('express').default & { static: ReturnType<typeof vi.fn> }
+    const fn = vi.fn(() => app) as unknown as typeof import('express').default & { static: ReturnType<typeof vi.fn>; json: ReturnType<typeof vi.fn> }
     fn.static = vi.fn()
+    fn.json = vi.fn(() => ({}))
     return { default: fn }
 })
 
