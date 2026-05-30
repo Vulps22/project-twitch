@@ -168,20 +168,17 @@ describe('TwitchClient', () => {
             const client = new TwitchClient({ accessToken: 'tok', clientId: 'cid', eventRouter })
             await new Promise(r => setTimeout(r, 0))
 
-            const message = {
-                metadata: { message_type: 'notification' },
-                payload: {
-                    subscription: { type: 'channel.chat.message' },
-                    event: { chatter_user_id: 'user-999', message: { text: '!lurk' } },
-                },
+            const notification = {
+                subscriptionType: 'channel.chat.message',
+                event: { chatter_user_id: 'user-999', message: { text: '!lurk' } },
             }
 
-            client.handleNotification(message as Parameters<typeof client.handleNotification>[0])
+            client.handleNotification(notification)
 
             expect(eventRouter.route).toHaveBeenCalledOnce()
             const routed = (eventRouter.route as ReturnType<typeof vi.fn>).mock.calls[0][0] as TwitchRawEvent
             expect(routed.subscriptionType).toBe('channel.chat.message')
-            expect(routed.event).toEqual(message.payload.event)
+            expect(routed.event).toEqual(notification.event)
         })
 
         it("skips the bot's own chat messages", async () => {
@@ -191,15 +188,12 @@ describe('TwitchClient', () => {
             await new Promise(r => setTimeout(r, 0))
 
             // The bot's own userId was set to 'user-123' by the mocked getUserId response
-            const message = {
-                metadata: { message_type: 'notification' },
-                payload: {
-                    subscription: { type: 'channel.chat.message' },
-                    event: { chatter_user_id: 'user-123' }, // same as bot userId
-                },
+            const notification = {
+                subscriptionType: 'channel.chat.message',
+                event: { chatter_user_id: 'user-123' }, // same as bot userId
             }
 
-            client.handleNotification(message as Parameters<typeof client.handleNotification>[0])
+            client.handleNotification(notification)
 
             expect(eventRouter.route).not.toHaveBeenCalled()
         })
@@ -209,18 +203,13 @@ describe('TwitchClient', () => {
             const client = new TwitchClient({ accessToken: 'tok', clientId: 'cid' })
             await new Promise(r => setTimeout(r, 0))
 
-            const message = {
-                metadata: { message_type: 'notification' },
-                payload: {
-                    subscription: { type: 'channel.follow' },
-                    event: { user_id: 'follower-1' },
-                },
+            const notification = {
+                subscriptionType: 'channel.follow',
+                event: { user_id: 'follower-1' },
             }
 
             // Should not throw
-            expect(() =>
-                client.handleNotification(message as Parameters<typeof client.handleNotification>[0])
-            ).not.toThrow()
+            expect(() => client.handleNotification(notification)).not.toThrow()
         })
 
         it('routes non-chat events regardless of user id', async () => {
@@ -229,15 +218,12 @@ describe('TwitchClient', () => {
             const client = new TwitchClient({ accessToken: 'tok', clientId: 'cid', eventRouter })
             await new Promise(r => setTimeout(r, 0))
 
-            const message = {
-                metadata: { message_type: 'notification' },
-                payload: {
-                    subscription: { type: 'channel.follow' },
-                    event: { user_id: 'user-123' }, // same id but different event type — should NOT be filtered
-                },
+            const notification = {
+                subscriptionType: 'channel.follow',
+                event: { user_id: 'user-123' }, // same id but different event type — should NOT be filtered
             }
 
-            client.handleNotification(message as Parameters<typeof client.handleNotification>[0])
+            client.handleNotification(notification)
 
             expect(eventRouter.route).toHaveBeenCalledOnce()
         })
