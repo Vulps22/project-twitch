@@ -9,6 +9,9 @@ interface ViewerRecord {
     username: string
     firstSeen: number
     messageCount: number
+    bits: number
+    subs: number
+    pointsRedeemed: number
 }
 
 export class ViewerTracker {
@@ -54,12 +57,50 @@ export class ViewerTracker {
                 existing.messageCount++;
                 existing.username = username;
             } else {
-                this.viewers.set(userId, { username, firstSeen: now, messageCount: 1 });
+                this.viewers.set(userId, { username, firstSeen: now, messageCount: 1, bits: 0, subs: 0, pointsRedeemed: 0 });
             }
+
 
             this.dashboardBroadcaster?.broadcast({ type: 'chat', userId, username });
             Logger.debug(`ViewerTracker: chat from ${username}`);
+            return;
         }
+
+        if (subscriptionType === 'channel.cheer') {
+            if (event['is_anonymous']) return;
+            const userId = String(event['user_id'] ?? '');
+            const username = String(event['user_name'] ?? '');
+            const bits = Number(event['bits'] ?? 0);
+            if (!userId) return;
+            this.ensureViewer(userId, username).bits += bits;
+            return;
+        }
+
+        if (subscriptionType === 'channel.subscribe') {
+            const userId = String(event['user_id'] ?? '');
+            const username = String(event['user_name'] ?? '');
+            if (!userId) return;
+            this.ensureViewer(userId, username).subs++;
+            return;
+        }
+
+        if (subscriptionType === 'channel.channel_points_custom_reward_redemption.add') {
+            const userId = String(event['user_id'] ?? '');
+            const username = String(event['user_name'] ?? '');
+            if (!userId) return;
+            this.ensureViewer(userId, username).pointsRedeemed++;
+        }
+    }
+
+    private ensureViewer(userId: string, username: string): ViewerRecord {
+        const existing = this.viewers.get(userId);
+        if (existing) {
+            existing.username = username;
+            return existing;
+        }
+        const record: ViewerRecord = { username, firstSeen: Date.now(), messageCount: 0, bits: 0, subs: 0, pointsRedeemed: 0 };
+        this.viewers.set(userId, record);
+        return record;
     }
 
     reset(): void {
@@ -75,6 +116,9 @@ export class ViewerTracker {
                 username: record.username,
                 watchTime: Math.floor((now - record.firstSeen) / 1000),
                 messageCount: record.messageCount,
+                bits: record.bits,
+                subs: record.subs,
+                pointsRedeemed: record.pointsRedeemed,
             }))
             .sort((a, b) => b.watchTime - a.watchTime);
     }
@@ -87,7 +131,7 @@ export class ViewerTracker {
 
         for (const { userId, username } of chatters) {
             if (!this.viewers.has(userId)) {
-                this.viewers.set(userId, { username, firstSeen: now, messageCount: 0 });
+                this.viewers.set(userId, { username, firstSeen: now, messageCount: 0, bits: 0, subs: 0, pointsRedeemed: 0 });
             }
         }
 

@@ -5,6 +5,9 @@ export interface Viewer {
     username: string
     watchTime: number
     messageCount: number
+    bits: number
+    subs: number
+    pointsRedeemed: number
 }
 
 export function useViewers(): Viewer[] {

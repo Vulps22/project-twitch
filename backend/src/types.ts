@@ -78,6 +78,9 @@ export interface ViewerData {
     username: string
     watchTime: number
     messageCount: number
+    bits: number
+    subs: number
+    pointsRedeemed: number
 }
 
 export interface ITwitchClient {

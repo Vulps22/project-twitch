@@ -92,7 +92,7 @@ export default function ViewersPanel() {
                         : v
                 );
             }
-            return [...prev, { userId: flash.userId, username: flash.username, watchTime: 0, messageCount: 1 }];
+            return [...prev, { userId: flash.userId, username: flash.username, watchTime: 0, messageCount: 1, bits: 0, subs: 0, pointsRedeemed: 0 }];
         });
 
         return () => clearTimeout(timeout);
@@ -116,7 +116,10 @@ export default function ViewersPanel() {
                         <tr style={{ color: 'var(--muted)', textAlign: 'left' }}>
                             <th style={{ paddingBottom: 8, fontWeight: 500 }}>Username</th>
                             <th style={{ paddingBottom: 8, fontWeight: 500 }}>Watching for</th>
-                            <th style={{ paddingBottom: 8, fontWeight: 500, textAlign: 'right' }}>Messages</th>
+                            <th style={{ paddingBottom: 8, fontWeight: 500, textAlign: 'right' }}>Msgs</th>
+                            <th style={{ paddingBottom: 8, fontWeight: 500, textAlign: 'right' }}>Bits</th>
+                            <th style={{ paddingBottom: 8, fontWeight: 500, textAlign: 'right' }}>Subs</th>
+                            <th style={{ paddingBottom: 8, fontWeight: 500, textAlign: 'right' }}>Points</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -132,6 +135,9 @@ export default function ViewersPanel() {
                                 <td style={{ padding: '6px 0' }}>{viewer.username}</td>
                                 <td style={{ padding: '6px 0' }}>{formatWatchTime(viewer.watchTime)}</td>
                                 <td style={{ padding: '6px 0', textAlign: 'right' }}>{viewer.messageCount}</td>
+                                <td style={{ padding: '6px 0', textAlign: 'right' }}>{viewer.bits.toLocaleString()}</td>
+                                <td style={{ padding: '6px 0', textAlign: 'right' }}>{viewer.subs}</td>
+                                <td style={{ padding: '6px 0', textAlign: 'right' }}>{viewer.pointsRedeemed.toLocaleString()}</td>
                             </tr>
                         ))}
                     </tbody>
