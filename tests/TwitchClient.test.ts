@@ -228,4 +228,85 @@ describe('TwitchClient', () => {
             expect(eventRouter.route).toHaveBeenCalledOnce()
         })
     })
+
+    describe('timeout', () => {
+        it('POSTs to the Helix bans endpoint with duration', async () => {
+            setupInitMocks()
+            const client = new TwitchClient({ accessToken: 'tok', clientId: 'cid' })
+            await new Promise(r => setTimeout(r, 0))
+
+            mockFetch.mockResolvedValueOnce(makeResponse(true, {}))
+
+            await client.timeout('target-user', 300)
+
+            const lastCall = mockFetch.mock.calls[mockFetch.mock.calls.length - 1]
+            const [url, options] = lastCall as [string, { method: string; body: string; headers: Record<string, string> }]
+            expect(url).toContain('https://api.twitch.tv/helix/moderation/bans')
+            expect(url).toContain('broadcaster_id=')
+            expect(url).toContain('moderator_id=')
+            expect(options.method).toBe('POST')
+            const body = JSON.parse(options.body) as { data: { user_id: string; duration: number } }
+            expect(body.data.user_id).toBe('target-user')
+            expect(body.data.duration).toBe(300)
+        })
+
+        it('does nothing when channelId is not set', async () => {
+            mockFetch.mockResolvedValueOnce(makeResponse(false, {}, 'Unauthorized')) // getUserId fails
+            mockFetch.mockResolvedValueOnce(validationResponse())
+
+            const client = new TwitchClient({ accessToken: 'tok', clientId: 'cid' })
+            await new Promise(r => setTimeout(r, 0))
+
+            const callsBefore = mockFetch.mock.calls.length
+            await client.timeout('target-user', 60)
+            expect(mockFetch.mock.calls.length).toBe(callsBefore)
+        })
+    })
+
+    describe('ban', () => {
+        it('POSTs to the Helix bans endpoint without duration', async () => {
+            setupInitMocks()
+            const client = new TwitchClient({ accessToken: 'tok', clientId: 'cid' })
+            await new Promise(r => setTimeout(r, 0))
+
+            mockFetch.mockResolvedValueOnce(makeResponse(true, {}))
+
+            await client.ban('target-user')
+
+            const lastCall = mockFetch.mock.calls[mockFetch.mock.calls.length - 1]
+            const [url, options] = lastCall as [string, { method: string; body: string }]
+            expect(url).toContain('https://api.twitch.tv/helix/moderation/bans')
+            expect(options.method).toBe('POST')
+            const body = JSON.parse(options.body) as { data: { user_id: string; duration?: number } }
+            expect(body.data.user_id).toBe('target-user')
+            expect(body.data.duration).toBeUndefined()
+        })
+
+        it('includes reason when provided', async () => {
+            setupInitMocks()
+            const client = new TwitchClient({ accessToken: 'tok', clientId: 'cid' })
+            await new Promise(r => setTimeout(r, 0))
+
+            mockFetch.mockResolvedValueOnce(makeResponse(true, {}))
+
+            await client.ban('target-user', 'ban reason')
+
+            const lastCall = mockFetch.mock.calls[mockFetch.mock.calls.length - 1]
+            const [, options] = lastCall as [string, { body: string }]
+            const body = JSON.parse(options.body) as { data: { reason: string } }
+            expect(body.data.reason).toBe('ban reason')
+        })
+
+        it('does nothing when channelId is not set', async () => {
+            mockFetch.mockResolvedValueOnce(makeResponse(false, {}, 'Unauthorized')) // getUserId fails
+            mockFetch.mockResolvedValueOnce(validationResponse())
+
+            const client = new TwitchClient({ accessToken: 'tok', clientId: 'cid' })
+            await new Promise(r => setTimeout(r, 0))
+
+            const callsBefore = mockFetch.mock.calls.length
+            await client.ban('target-user')
+            expect(mockFetch.mock.calls.length).toBe(callsBefore)
+        })
+    })
 })

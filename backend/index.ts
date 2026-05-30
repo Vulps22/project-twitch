@@ -160,6 +160,24 @@ app.get('/api/viewers', (_req: Request, res: Response) => {
     res.json(viewerTracker.getViewers());
 });
 
+app.post('/api/mod/timeout/:userId', async (req: Request, res: Response) => {
+    if (!twitchClient) { res.status(503).json({ error: 'Twitch client not connected' }); return; }
+    const { duration } = req.body as { duration: number };
+    if (typeof duration !== 'number' || duration <= 0) {
+        res.status(400).json({ error: 'duration must be a positive number' });
+        return;
+    }
+    await twitchClient.timeout(req.params.userId, duration);
+    res.json({ ok: true });
+});
+
+app.post('/api/mod/ban/:userId', async (req: Request, res: Response) => {
+    if (!twitchClient) { res.status(503).json({ error: 'Twitch client not connected' }); return; }
+    const { reason } = req.body as { reason?: string };
+    await twitchClient.ban(req.params.userId, reason);
+    res.json({ ok: true });
+});
+
 app.get('/api/status', (_req: Request, res: Response) => {
     const twitchStatus = twitchClient?.getStatus() ?? {
         bot: { connected: false },
