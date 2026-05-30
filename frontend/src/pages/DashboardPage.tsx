@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import StreamStatsPanel from '../components/StreamStatsPanel.tsx';
 import EventLogSidebar from '../components/EventLogSidebar.tsx';
 import ViewersPanel from '../components/ViewersPanel.tsx';
+import ChatFeedPanel from '../components/ChatFeedPanel.tsx';
+import { useDashboardSocket } from '../hooks/useDashboardSocket.ts';
 
 function useIsLive(): boolean {
   const [isLive, setIsLive] = useState(false);
@@ -23,6 +25,7 @@ function useIsLive(): boolean {
 
 export default function DashboardPage() {
   const isLive = useIsLive();
+  const flash = useDashboardSocket();
 
   return (
     <div style={{
@@ -33,7 +36,10 @@ export default function DashboardPage() {
     }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         <StreamStatsPanel />
-        <ViewersPanel />
+        <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: 20, alignItems: 'start' }}>
+          <ViewersPanel flash={flash} />
+          <ChatFeedPanel />
+        </div>
       </div>
 
       {isLive && (
