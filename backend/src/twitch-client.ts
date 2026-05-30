@@ -170,6 +170,7 @@ export class TwitchClient {
                 'channel:read:subscriptions',
                 'channel:read:redemptions',
                 'bits:read',
+                'moderator:manage:banned_users',
             ]);
         } else {
             await this.validateScopes(this.accessToken, 'single-account', [
@@ -380,6 +381,40 @@ export class TwitchClient {
             Logger.error('TwitchClient: Error getting chatters:', error);
             return [];
         }
+    }
+
+    async timeout(userId: string, duration: number): Promise<void> {
+        if (!this.channelId) return;
+        await fetch(
+            `https://api.twitch.tv/helix/moderation/bans?broadcaster_id=${this.channelId}&moderator_id=${this.channelId}`,
+            {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.broadcasterToken}`,
+                    'Client-Id': this.clientId,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ data: { user_id: userId, duration } }),
+            }
+        );
+    }
+
+    async ban(userId: string, reason?: string): Promise<void> {
+        if (!this.channelId) return;
+        const data: { user_id: string; reason?: string } = { user_id: userId };
+        if (reason) data.reason = reason;
+        await fetch(
+            `https://api.twitch.tv/helix/moderation/bans?broadcaster_id=${this.channelId}&moderator_id=${this.channelId}`,
+            {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.broadcasterToken}`,
+                    'Client-Id': this.clientId,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ data }),
+            }
+        );
     }
 
     getStatus(): { bot: { connected: boolean }; broadcaster: { connected: boolean; configured: boolean } } {

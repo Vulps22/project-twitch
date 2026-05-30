@@ -87,6 +87,8 @@ export interface ViewerData {
 export interface ITwitchClient {
     sendChatMessage(message: string): Promise<boolean>
     getChatters(): Promise<{ userId: string; username: string }[]>
+    timeout(userId: string, duration: number): Promise<void>
+    ban(userId: string, reason?: string): Promise<void>
 }
 
 export interface IOverlayBroadcaster {
