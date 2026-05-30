@@ -15,6 +15,7 @@ const SCOPES = {
         'channel:read:subscriptions',
         'channel:read:redemptions',
         'bits:read',
+        'moderator:manage:banned_users',
     ],
 };
 

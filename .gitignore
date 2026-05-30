@@ -201,6 +201,9 @@ backend/data/
 *.sqlite
 *.sqlite3
 
+# Runtime data directory (events.json, etc — managed locally)
+data/
+
 # Logs
 logs
 *.log

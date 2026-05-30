@@ -168,20 +168,17 @@ describe('TwitchClient', () => {
             const client = new TwitchClient({ accessToken: 'tok', clientId: 'cid', eventRouter })
             await new Promise(r => setTimeout(r, 0))
 
-            const message = {
-                metadata: { message_type: 'notification' },
-                payload: {
-                    subscription: { type: 'channel.chat.message' },
-                    event: { chatter_user_id: 'user-999', message: { text: '!lurk' } },
-                },
+            const notification = {
+                subscriptionType: 'channel.chat.message',
+                event: { chatter_user_id: 'user-999', message: { text: '!lurk' } },
             }
 
-            client.handleNotification(message as Parameters<typeof client.handleNotification>[0])
+            client.handleNotification(notification)
 
             expect(eventRouter.route).toHaveBeenCalledOnce()
             const routed = (eventRouter.route as ReturnType<typeof vi.fn>).mock.calls[0][0] as TwitchRawEvent
             expect(routed.subscriptionType).toBe('channel.chat.message')
-            expect(routed.event).toEqual(message.payload.event)
+            expect(routed.event).toEqual(notification.event)
         })
 
         it("skips the bot's own chat messages", async () => {
@@ -191,15 +188,12 @@ describe('TwitchClient', () => {
             await new Promise(r => setTimeout(r, 0))
 
             // The bot's own userId was set to 'user-123' by the mocked getUserId response
-            const message = {
-                metadata: { message_type: 'notification' },
-                payload: {
-                    subscription: { type: 'channel.chat.message' },
-                    event: { chatter_user_id: 'user-123' }, // same as bot userId
-                },
+            const notification = {
+                subscriptionType: 'channel.chat.message',
+                event: { chatter_user_id: 'user-123' }, // same as bot userId
             }
 
-            client.handleNotification(message as Parameters<typeof client.handleNotification>[0])
+            client.handleNotification(notification)
 
             expect(eventRouter.route).not.toHaveBeenCalled()
         })
@@ -209,18 +203,13 @@ describe('TwitchClient', () => {
             const client = new TwitchClient({ accessToken: 'tok', clientId: 'cid' })
             await new Promise(r => setTimeout(r, 0))
 
-            const message = {
-                metadata: { message_type: 'notification' },
-                payload: {
-                    subscription: { type: 'channel.follow' },
-                    event: { user_id: 'follower-1' },
-                },
+            const notification = {
+                subscriptionType: 'channel.follow',
+                event: { user_id: 'follower-1' },
             }
 
             // Should not throw
-            expect(() =>
-                client.handleNotification(message as Parameters<typeof client.handleNotification>[0])
-            ).not.toThrow()
+            expect(() => client.handleNotification(notification)).not.toThrow()
         })
 
         it('routes non-chat events regardless of user id', async () => {
@@ -229,17 +218,95 @@ describe('TwitchClient', () => {
             const client = new TwitchClient({ accessToken: 'tok', clientId: 'cid', eventRouter })
             await new Promise(r => setTimeout(r, 0))
 
-            const message = {
-                metadata: { message_type: 'notification' },
-                payload: {
-                    subscription: { type: 'channel.follow' },
-                    event: { user_id: 'user-123' }, // same id but different event type — should NOT be filtered
-                },
+            const notification = {
+                subscriptionType: 'channel.follow',
+                event: { user_id: 'user-123' }, // same id but different event type — should NOT be filtered
             }
 
-            client.handleNotification(message as Parameters<typeof client.handleNotification>[0])
+            client.handleNotification(notification)
 
             expect(eventRouter.route).toHaveBeenCalledOnce()
+        })
+    })
+
+    describe('timeout', () => {
+        it('POSTs to the Helix bans endpoint with duration', async () => {
+            setupInitMocks()
+            const client = new TwitchClient({ accessToken: 'tok', clientId: 'cid' })
+            await new Promise(r => setTimeout(r, 0))
+
+            mockFetch.mockResolvedValueOnce(makeResponse(true, {}))
+
+            await client.timeout('target-user', 300)
+
+            const lastCall = mockFetch.mock.calls[mockFetch.mock.calls.length - 1]
+            const [url, options] = lastCall as [string, { method: string; body: string; headers: Record<string, string> }]
+            expect(url).toContain('https://api.twitch.tv/helix/moderation/bans')
+            expect(url).toContain('broadcaster_id=')
+            expect(url).toContain('moderator_id=')
+            expect(options.method).toBe('POST')
+            const body = JSON.parse(options.body) as { data: { user_id: string; duration: number } }
+            expect(body.data.user_id).toBe('target-user')
+            expect(body.data.duration).toBe(300)
+        })
+
+        it('does nothing when channelId is not set', async () => {
+            mockFetch.mockResolvedValueOnce(makeResponse(false, {}, 'Unauthorized')) // getUserId fails
+            mockFetch.mockResolvedValueOnce(validationResponse())
+
+            const client = new TwitchClient({ accessToken: 'tok', clientId: 'cid' })
+            await new Promise(r => setTimeout(r, 0))
+
+            const callsBefore = mockFetch.mock.calls.length
+            await client.timeout('target-user', 60)
+            expect(mockFetch.mock.calls.length).toBe(callsBefore)
+        })
+    })
+
+    describe('ban', () => {
+        it('POSTs to the Helix bans endpoint without duration', async () => {
+            setupInitMocks()
+            const client = new TwitchClient({ accessToken: 'tok', clientId: 'cid' })
+            await new Promise(r => setTimeout(r, 0))
+
+            mockFetch.mockResolvedValueOnce(makeResponse(true, {}))
+
+            await client.ban('target-user')
+
+            const lastCall = mockFetch.mock.calls[mockFetch.mock.calls.length - 1]
+            const [url, options] = lastCall as [string, { method: string; body: string }]
+            expect(url).toContain('https://api.twitch.tv/helix/moderation/bans')
+            expect(options.method).toBe('POST')
+            const body = JSON.parse(options.body) as { data: { user_id: string; duration?: number } }
+            expect(body.data.user_id).toBe('target-user')
+            expect(body.data.duration).toBeUndefined()
+        })
+
+        it('includes reason when provided', async () => {
+            setupInitMocks()
+            const client = new TwitchClient({ accessToken: 'tok', clientId: 'cid' })
+            await new Promise(r => setTimeout(r, 0))
+
+            mockFetch.mockResolvedValueOnce(makeResponse(true, {}))
+
+            await client.ban('target-user', 'ban reason')
+
+            const lastCall = mockFetch.mock.calls[mockFetch.mock.calls.length - 1]
+            const [, options] = lastCall as [string, { body: string }]
+            const body = JSON.parse(options.body) as { data: { reason: string } }
+            expect(body.data.reason).toBe('ban reason')
+        })
+
+        it('does nothing when channelId is not set', async () => {
+            mockFetch.mockResolvedValueOnce(makeResponse(false, {}, 'Unauthorized')) // getUserId fails
+            mockFetch.mockResolvedValueOnce(validationResponse())
+
+            const client = new TwitchClient({ accessToken: 'tok', clientId: 'cid' })
+            await new Promise(r => setTimeout(r, 0))
+
+            const callsBefore = mockFetch.mock.calls.length
+            await client.ban('target-user')
+            expect(mockFetch.mock.calls.length).toBe(callsBefore)
         })
     })
 })

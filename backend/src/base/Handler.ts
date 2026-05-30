@@ -1,5 +1,5 @@
 import Logger from '../utils/Logger.js';
-import type { EventConfig, ITwitchClient, IOverlayBroadcaster, OverlayEvent, TemplateData } from '../types.js';
+import type { EventConfig, ITwitchClient, IOverlayBroadcaster, OverlayEvent, OverlayReaction, TemplateData } from '../types.js';
 
 export class Handler {
     protected twitchClient: ITwitchClient | null;
@@ -16,32 +16,35 @@ export class Handler {
     async executeConfig(config: EventConfig, templateData: TemplateData): Promise<void> {
         Logger.info(`Handler: Executing "${config.event_name}"`);
 
-        if (config.reply) {
-            if (this.twitchClient) {
-                const message = this.processTemplate(config.reply, templateData);
-                Logger.info(`Handler: Sending chat reply: "${message}"`);
-                const ok = await this.twitchClient.sendChatMessage(message);
-                Logger.info(`Handler: Chat reply ${ok ? 'sent' : 'FAILED'}`);
+        const overlayReactions: OverlayReaction[] = [];
+
+        for (const reaction of config.reactions) {
+            if (reaction.type === 'chat_reply') {
+                if (this.twitchClient) {
+                    const message = this.processTemplate(reaction.message, templateData);
+                    Logger.info(`Handler: Sending chat reply: "${message}"`);
+                    const ok = await this.twitchClient.sendChatMessage(message);
+                    Logger.info(`Handler: Chat reply ${ok ? 'sent' : 'FAILED'}`);
+                } else {
+                    Logger.warn('Handler: Skipping reply — twitchClient not set');
+                }
+            } else if (reaction.type === 'overlay_text') {
+                overlayReactions.push({
+                    ...reaction,
+                    text: this.processTemplate(reaction.text, templateData),
+                });
             } else {
-                Logger.warn('Handler: Skipping reply — twitchClient not set');
+                overlayReactions.push(reaction);
             }
         }
 
-        if (config.image || config.sound || config.text || config.video) {
-            const overlayEvent: OverlayEvent = {
-                type: 'event',
-                event_name: config.event_name,
-                image: config.image,
-                sound: config.sound,
-                volume: config.volume,
-                video: config.video,
-                text: this.processTemplate(config.text, templateData),
-                transition_in: config.transition_in,
-                transition_out: config.transition_out,
-                timeout: config.timeout
-            };
-
+        if (overlayReactions.length > 0) {
             if (this.overlayBroadcasterService) {
+                const overlayEvent: OverlayEvent = {
+                    type: 'event',
+                    event_name: config.event_name,
+                    reactions: overlayReactions,
+                };
                 Logger.info(`Handler: Broadcasting overlay event for "${config.event_name}"`);
                 await this.overlayBroadcasterService.broadcast(overlayEvent);
             } else {
