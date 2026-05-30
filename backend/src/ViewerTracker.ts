@@ -49,6 +49,7 @@ export class ViewerTracker {
         if (subscriptionType === 'channel.chat.message') {
             const userId = String(event['chatter_user_id'] ?? '');
             const username = String(event['chatter_user_name'] ?? event['chatter_user_login'] ?? '');
+            const message = String((event['message'] as { text?: string } | undefined)?.text ?? '');
             if (!userId) return;
 
             const now = Date.now();
@@ -61,7 +62,7 @@ export class ViewerTracker {
             }
 
 
-            this.dashboardBroadcaster?.broadcast({ type: 'chat', userId, username });
+            this.dashboardBroadcaster?.broadcast({ type: 'chat', userId, username, message });
             Logger.debug(`ViewerTracker: chat from ${username}`);
             return;
         }

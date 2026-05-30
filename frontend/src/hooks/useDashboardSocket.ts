@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 export interface ChatFlash {
     userId: string
     username: string
+    message: string
 }
 
 export function useDashboardSocket(): ChatFlash | null {
@@ -14,9 +15,9 @@ export function useDashboardSocket(): ChatFlash | null {
 
         ws.onmessage = (e) => {
             try {
-                const event = JSON.parse(e.data as string) as { type: string; userId: string; username: string };
+                const event = JSON.parse(e.data as string) as { type: string; userId: string; username: string; message: string };
                 if (event.type === 'chat') {
-                    setFlash({ userId: event.userId, username: event.username });
+                    setFlash({ userId: event.userId, username: event.username, message: event.message });
                 }
             } catch { /* ignore malformed messages */ }
         };

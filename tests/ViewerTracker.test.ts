@@ -57,8 +57,8 @@ describe('ViewerTracker', () => {
         })
 
         it('broadcasts a chat event to the dashboard', () => {
-            tracker.recordEvent('channel.chat.message', { chatter_user_id: 'u1', chatter_user_name: 'Alice' })
-            expect(broadcaster.broadcast).toHaveBeenCalledWith({ type: 'chat', userId: 'u1', username: 'Alice' })
+            tracker.recordEvent('channel.chat.message', { chatter_user_id: 'u1', chatter_user_name: 'Alice', message: { text: 'hello' } })
+            expect(broadcaster.broadcast).toHaveBeenCalledWith({ type: 'chat', userId: 'u1', username: 'Alice', message: 'hello' })
         })
 
         it('does nothing when chatter_user_id is missing', () => {

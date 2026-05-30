@@ -1,20 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { useDashboardSocket } from '../hooks/useDashboardSocket.ts';
+import type { ChatFlash } from '../hooks/useDashboardSocket.ts';
 import type { Viewer } from '../hooks/useViewers.ts';
-
-interface ChatFlash {
-    userId: string
-    username: string
-}
-
-function formatWatchTime(seconds: number): string {
-    if (seconds < 60) return `${seconds}s`;
-    const mins = Math.floor(seconds / 60);
-    if (mins < 60) return `${mins}m`;
-    const hrs = Math.floor(mins / 60);
-    const rem = mins % 60;
-    return rem > 0 ? `${hrs}h ${rem}m` : `${hrs}h`;
-}
 
 // 5 pentatonic ratios × 4 octaves = 20 unique pitches, all musically consonant
 const PENTATONIC_RATIOS = [1, 1.125, 1.25, 1.5, 1.667];
@@ -49,9 +35,8 @@ function playBeep(userId: string): void {
     } catch { /* AudioContext unavailable */ }
 }
 
-export default function ViewersPanel() {
+export default function ViewersPanel({ flash }: { flash: ChatFlash | null }) {
     const [viewers, setViewers] = useState<Viewer[]>([]);
-    const flash = useDashboardSocket();
     const [flashing, setFlashing] = useState<Set<string>>(new Set());
     const prevFlash = useRef<ChatFlash | null>(null);
 
@@ -115,7 +100,6 @@ export default function ViewersPanel() {
                     <thead>
                         <tr style={{ color: 'var(--muted)', textAlign: 'left' }}>
                             <th style={{ paddingBottom: 8, fontWeight: 500 }}>Username</th>
-                            <th style={{ paddingBottom: 8, fontWeight: 500 }}>Watching for</th>
                             <th style={{ paddingBottom: 8, fontWeight: 500, textAlign: 'right' }}>Msgs</th>
                             <th style={{ paddingBottom: 8, fontWeight: 500, textAlign: 'right' }}>Bits</th>
                             <th style={{ paddingBottom: 8, fontWeight: 500, textAlign: 'right' }}>Subs</th>
@@ -133,7 +117,6 @@ export default function ViewersPanel() {
                                 }}
                             >
                                 <td style={{ padding: '6px 0' }}>{viewer.username}</td>
-                                <td style={{ padding: '6px 0' }}>{formatWatchTime(viewer.watchTime)}</td>
                                 <td style={{ padding: '6px 0', textAlign: 'right' }}>{viewer.messageCount}</td>
                                 <td style={{ padding: '6px 0', textAlign: 'right' }}>{viewer.bits.toLocaleString()}</td>
                                 <td style={{ padding: '6px 0', textAlign: 'right' }}>{viewer.subs}</td>
