@@ -38,7 +38,7 @@ export default function DashboardPage() {
         <StreamStatsPanel />
         <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: 20, alignItems: 'start' }}>
           <ViewersPanel flash={flash} />
-          <ChatFeedPanel />
+          <ChatFeedPanel flash={flash} />
         </div>
       </div>
 
