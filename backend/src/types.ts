@@ -66,6 +66,7 @@ export interface DashboardChatEvent {
     type: 'chat'
     userId: string
     username: string
+    message: string
 }
 
 export interface IDashboardBroadcaster {
