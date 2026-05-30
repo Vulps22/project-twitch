@@ -22,6 +22,10 @@ interface TwitchSubscribeError {
     error?: string
 }
 
+interface TwitchChattersResponse {
+    data: { user_id: string; user_login: string; user_name: string }[]
+}
+
 export interface TwitchClientOptions {
     accessToken?: string
     broadcasterToken?: string
@@ -43,6 +47,7 @@ export class TwitchClient {
     private eventRouter: IEventRouter | null;
     private botSession: EventSubSession;
     private broadcasterSession: EventSubSession | null;
+    private initPromise: Promise<void>;
 
     constructor(options: TwitchClientOptions = {}) {
         const accessToken = options.accessToken ?? process.env.TWITCH_ACCESS_TOKEN;
@@ -78,7 +83,11 @@ export class TwitchClient {
             )
             : null;
 
-        this.init();
+        this.initPromise = this.init();
+    }
+
+    whenReady(): Promise<void> {
+        return this.initPromise;
     }
 
     async init(): Promise<void> {
@@ -352,6 +361,25 @@ export class TwitchClient {
             const data = await res.json() as { total: number };
             return data.total ?? null;
         } catch { return null; }
+    }
+
+    async getChatters(): Promise<{ userId: string; username: string }[]> {
+        if (!this.channelId || !this.userId) return [];
+        try {
+            const res = await fetch(
+                `https://api.twitch.tv/helix/chat/chatters?broadcaster_id=${this.channelId}&moderator_id=${this.userId}`,
+                { headers: { 'Authorization': `Bearer ${this.accessToken}`, 'Client-Id': this.clientId } }
+            );
+            if (!res.ok) {
+                Logger.warn('TwitchClient: getChatters failed:', res.statusText);
+                return [];
+            }
+            const data = await res.json() as TwitchChattersResponse;
+            return data.data.map(c => ({ userId: c.user_id, username: c.user_name }));
+        } catch (error) {
+            Logger.error('TwitchClient: Error getting chatters:', error);
+            return [];
+        }
     }
 
     getStatus(): { bot: { connected: boolean }; broadcaster: { connected: boolean; configured: boolean } } {

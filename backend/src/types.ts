@@ -62,8 +62,30 @@ export interface OverlayEvent {
     reactions: OverlayReaction[]
 }
 
+export interface DashboardChatEvent {
+    type: 'chat'
+    userId: string
+    username: string
+}
+
+export interface IDashboardBroadcaster {
+    broadcast(event: DashboardChatEvent): void
+    getClientCount(): number
+}
+
+export interface ViewerData {
+    userId: string
+    username: string
+    watchTime: number
+    messageCount: number
+    bits: number
+    subs: number
+    pointsRedeemed: number
+}
+
 export interface ITwitchClient {
     sendChatMessage(message: string): Promise<boolean>
+    getChatters(): Promise<{ userId: string; username: string }[]>
 }
 
 export interface IOverlayBroadcaster {

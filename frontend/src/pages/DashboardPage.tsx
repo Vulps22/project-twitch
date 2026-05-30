@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import StreamStatsPanel from '../components/StreamStatsPanel.tsx';
 import EventLogSidebar from '../components/EventLogSidebar.tsx';
+import ViewersPanel from '../components/ViewersPanel.tsx';
 
 function useIsLive(): boolean {
   const [isLive, setIsLive] = useState(false);
@@ -32,7 +33,7 @@ export default function DashboardPage() {
     }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         <StreamStatsPanel />
-        <Placeholder label="Viewers" />
+        <ViewersPanel />
       </div>
 
       {isLive && (
@@ -44,17 +45,3 @@ export default function DashboardPage() {
   );
 }
 
-function Placeholder({ label }: { label: string }) {
-  return (
-    <div style={{
-      background: 'var(--surface)',
-      border: '1px solid var(--border)',
-      borderRadius: 8,
-      padding: 24,
-      color: 'var(--muted)',
-      fontSize: 13,
-    }}>
-      {label}
-    </div>
-  );
-}

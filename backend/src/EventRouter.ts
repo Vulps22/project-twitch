@@ -8,6 +8,7 @@ import Logger from './utils/Logger.js';
 import type { EventConfig, TwitchRawEvent, TemplateData, ITwitchClient, IOverlayBroadcaster } from './types.js';
 import sessionStats from './SessionStats.js';
 import eventLog from './EventLog.js';
+import viewerTracker from './ViewerTracker.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -63,6 +64,7 @@ export class EventRouter extends Handler {
     async route(rawEvent: TwitchRawEvent, replay = false): Promise<void> {
         Logger.info(`EventRouter: Routing "${rawEvent.subscriptionType}"${replay ? ' (replay)' : ''}`);
         sessionStats.recordEvent(rawEvent.subscriptionType, rawEvent.event);
+        viewerTracker.recordEvent(rawEvent.subscriptionType, rawEvent.event);
 
         let matched = false;
         for (const eventType of this.eventTypes) {
@@ -88,7 +90,9 @@ export class EventRouter extends Handler {
             }
         }
 
-        if (!matched) {
+        if (matched) {
+            sessionStats.recordEventFired();
+        } else {
             Logger.info(`EventRouter: No match for "${rawEvent.subscriptionType}"`);
         }
     }

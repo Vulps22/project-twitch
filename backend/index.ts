@@ -5,12 +5,14 @@ import { type Request, type Response } from 'express';
 import { TwitchClient } from './src/twitch-client.js';
 import { EventRouter } from './src/EventRouter.js';
 import OverlayBroadcasterService from './src/services/OverlayBroadcasterService.js';
+import DashboardBroadcasterService from './src/services/DashboardBroadcasterService.js';
 import { EVENTS } from './config/events.js';
 import Logger from './src/utils/Logger.js';
 import sessionStats from './src/SessionStats.js';
 import eventLog from './src/EventLog.js';
 import eventStorage from './src/EventStorage.js';
-import { wss, app } from './src/server.js';
+import viewerTracker from './src/ViewerTracker.js';
+import { wss, dashboardWss, app } from './src/server.js';
 
 Logger.info('Starting Twitch project backend...');
 
@@ -18,10 +20,13 @@ await eventStorage.load();
 
 let twitchClient: TwitchClient | null = null;
 let overlayBroadcasterService: OverlayBroadcasterService | null = null;
+let dashboardBroadcasterService: DashboardBroadcasterService | null = null;
 let eventRouter: EventRouter | null = null;
 
 try {
     overlayBroadcasterService = new OverlayBroadcasterService(wss);
+    dashboardBroadcasterService = new DashboardBroadcasterService(dashboardWss);
+    viewerTracker.setDashboardBroadcaster(dashboardBroadcasterService);
 
     if (process.env.TWITCH_ACCESS_TOKEN && process.env.TWITCH_CLIENT_ID) {
         eventRouter = new EventRouter(null, overlayBroadcasterService);
@@ -37,7 +42,10 @@ try {
             eventRouter
         });
 
+        await twitchClient.whenReady();
         eventRouter.setTwitchClient(twitchClient);
+        viewerTracker.setTwitchClient(twitchClient);
+        void viewerTracker.startPolling();
 
         Logger.info('All services initialised');
     } else {
@@ -148,6 +156,10 @@ app.delete('/api/events/:name', async (req: Request, res: Response) => {
     res.json({ ok: true });
 });
 
+app.get('/api/viewers', (_req: Request, res: Response) => {
+    res.json(viewerTracker.getViewers());
+});
+
 app.get('/api/status', (_req: Request, res: Response) => {
     const twitchStatus = twitchClient?.getStatus() ?? {
         bot: { connected: false },
@@ -159,4 +171,4 @@ app.get('/api/status', (_req: Request, res: Response) => {
     });
 });
 
-export { twitchClient, overlayBroadcasterService, eventRouter };
+export { twitchClient, overlayBroadcasterService, dashboardBroadcasterService, eventRouter };
