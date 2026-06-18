@@ -41,6 +41,31 @@ function normalizeGoogleUrl(url: string): string {
     return url;
 }
 
+async function fetchAsset(url: string): Promise<Response> {
+    const response = await fetch(url);
+    if (!response.ok) return response;
+
+    const contentType = response.headers.get('content-type') ?? '';
+    if (!contentType.startsWith('text/html') || !/google\.com/.test(url)) return response;
+
+    // Google returned a confirmation page — parse the form and resubmit
+    const html = await response.text();
+    const actionMatch = html.match(/action="([^"]+)"/);
+    if (!actionMatch) return response;
+
+    const action = actionMatch[1].replace(/&amp;/g, '&');
+    const base = action.startsWith('http') ? action : `https://drive.google.com${action}`;
+    const params = new URLSearchParams();
+    for (const [, name, value] of html.matchAll(/name="([^"]+)"\s+value="([^"]*)"/g)) {
+        params.set(name, value);
+    }
+
+    if (!params.has('id')) return response;
+
+    Logger.info(`AssetCacheService: Following Google Drive confirmation for ${url}`);
+    return fetch(`${base}?${params}`);
+}
+
 export function isExternalUrl(value: string): boolean {
     return value.startsWith('http://') || value.startsWith('https://');
 }
@@ -154,7 +179,7 @@ export class AssetCacheService {
 
         await mkdir(join(this.cacheDir, ASSET_TYPES[assetType].dir), { recursive: true });
 
-        const response = await fetch(fetchUrl);
+        const response = await fetchAsset(fetchUrl);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
         const mimeType = response.headers.get('content-type')?.split(';')[0].trim() ?? '';
@@ -200,7 +225,7 @@ export class AssetCacheService {
 
         await Promise.all(assets.map(async ({ url, assetType }) => {
             try {
-                const response = await fetch(normalizeGoogleUrl(url));
+                const response = await fetchAsset(normalizeGoogleUrl(url));
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
                 const mimeType = response.headers.get('content-type')?.split(';')[0].trim() ?? '';
