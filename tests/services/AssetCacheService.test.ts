@@ -24,9 +24,10 @@ function makeConfig(reactions: EventConfig['reactions']): EventConfig {
     return { event_name: 'test', event_type: 'follow', reactions };
 }
 
-function mockResponse(mimeType: string) {
+function mockResponse(mimeType: string, url = '') {
     return {
         ok: true,
+        url,
         headers: { get: (h: string) => h === 'content-type' ? mimeType : null },
         arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(8)),
     };
@@ -223,8 +224,13 @@ describe('AssetCacheService', () => {
         });
 
         it('throws on HTTP error', async () => {
-            mockFetch.mockResolvedValue({ ok: false, status: 404, headers: { get: () => null }, arrayBuffer: vi.fn() });
+            mockFetch.mockResolvedValue({ ok: false, status: 404, url: '', headers: { get: () => null }, arrayBuffer: vi.fn() });
             await expect(service.previewUrl(imgUrl, 'image')).rejects.toThrow('HTTP 404');
+        });
+
+        it('throws a clear message when Google redirects to sign-in', async () => {
+            mockFetch.mockResolvedValue({ ...mockResponse('text/html'), url: 'https://accounts.google.com/ServiceLogin' });
+            await expect(service.previewUrl(imgUrl, 'image')).rejects.toThrow('requires sign-in');
         });
     });
 
