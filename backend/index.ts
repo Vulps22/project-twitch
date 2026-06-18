@@ -182,6 +182,22 @@ app.post('/api/mod/ban/:userId', async (req: Request, res: Response) => {
     res.json({ ok: true });
 });
 
+app.post('/api/overlay-log', (req: Request, res: Response) => {
+    const { level, message } = req.body as { level?: string; message?: string };
+    if (!message) { res.status(400).json({ error: 'message required' }); return; }
+
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const timestamp = `${pad(now.getDate())}-${pad(now.getMonth() + 1)}-${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    const line = `[${timestamp}] [${assetCacheService.getHash()}] [Overlay] ${message}`;
+
+    if (level === 'error') console.error(line);
+    else if (level === 'warn')  console.warn(line);
+    else                        console.log(line);
+
+    res.json({ ok: true });
+});
+
 app.get('/api/status', (_req: Request, res: Response) => {
     const twitchStatus = twitchClient?.getStatus() ?? {
         bot: { connected: false },
