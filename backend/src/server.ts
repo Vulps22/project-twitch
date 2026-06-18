@@ -4,6 +4,8 @@ import { createServer, type Server } from 'http';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import Logger from './utils/Logger.js';
+import assetCacheService, { CACHE_ROOT } from './services/AssetCacheService.js';
+import eventStorage from './EventStorage.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -28,6 +30,8 @@ server.on('upgrade', (req, socket, head) => {
 
 wss.on('connection', (ws) => {
     Logger.info('Overlay connected');
+    assetCacheService.onConnect();
+    void assetCacheService.ensureReady(eventStorage.getAll());
 
     ws.send(JSON.stringify({ type: 'connection', message: 'Connected to backend' }));
 
@@ -37,17 +41,27 @@ wss.on('connection', (ws) => {
 
     ws.on('close', () => {
         Logger.info('Overlay disconnected');
+        assetCacheService.onDisconnect();
     });
 });
 
 dashboardWss.on('connection', (ws) => {
     Logger.info('Dashboard connected');
-    ws.on('close', () => Logger.info('Dashboard disconnected'));
+    assetCacheService.onConnect();
+    ws.on('close', () => {
+        Logger.info('Dashboard disconnected');
+        assetCacheService.onDisconnect();
+    });
 });
 
 app.use(express.json());
 app.use('/overlay', express.static(join(__dirname, '../../overlay')));
 app.use('/assets', express.static(join(__dirname, '../../assets')));
+app.use('/cache', express.static(CACHE_ROOT));
+app.use('/dashboard', (_req, _res, next) => {
+    void assetCacheService.ensureReady(eventStorage.getAll());
+    next();
+});
 app.use('/dashboard', express.static(join(__dirname, '../../dist/dashboard')));
 
 app.get('/', (_req: Request, res: Response) => {

@@ -6,6 +6,14 @@ vi.mock('../../backend/src/utils/Logger.js', () => ({
     default: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn(), log: vi.fn() },
 }))
 
+vi.mock('../../backend/src/services/AssetCacheService.js', () => ({
+    default: {
+        resolve: vi.fn((value: string) =>
+            value.startsWith('http') ? `/cache/test/${value.split('/').pop() ?? ''}` : ''
+        ),
+    },
+}))
+
 const baseConfig: EventConfig = {
     event_name: 'test_event',
     event_type: 'chat_command',
@@ -74,13 +82,13 @@ describe('Handler.executeConfig', () => {
     it('broadcasts an overlay event when an image reaction is present', async () => {
         await handler.executeConfig({
             ...baseConfig,
-            reactions: [{ type: 'image', url: 'alert.png' }],
+            reactions: [{ type: 'image', url: 'https://example.com/alert.png' }],
         }, {})
         expect(mockOverlay.broadcast).toHaveBeenCalledWith(expect.objectContaining({
             type: 'event',
             event_name: 'test_event',
             reactions: expect.arrayContaining([
-                expect.objectContaining({ type: 'image', url: 'alert.png' })
+                expect.objectContaining({ type: 'image', url: '/cache/test/alert.png' })
             ]),
         }))
     })
@@ -88,7 +96,7 @@ describe('Handler.executeConfig', () => {
     it('broadcasts when a sound reaction is present', async () => {
         await handler.executeConfig({
             ...baseConfig,
-            reactions: [{ type: 'sound', filename: 'alert.mp3' }],
+            reactions: [{ type: 'sound', filename: 'https://example.com/alert.mp3' }],
         }, {})
         expect(mockOverlay.broadcast).toHaveBeenCalled()
     })
@@ -110,7 +118,7 @@ describe('Handler.executeConfig', () => {
         const h = new Handler(mockTwitchClient, null)
         await h.executeConfig({
             ...baseConfig,
-            reactions: [{ type: 'image', url: 'alert.png' }],
+            reactions: [{ type: 'image', url: 'https://example.com/alert.png' }],
         }, {})
         expect(mockOverlay.broadcast).not.toHaveBeenCalled()
     })
@@ -119,7 +127,7 @@ describe('Handler.executeConfig', () => {
         await handler.executeConfig({
             ...baseConfig,
             reactions: [
-                { type: 'image', url: 'x.png' },
+                { type: 'image', url: 'https://example.com/x.png' },
                 { type: 'overlay_text', text: '{{username}} arrived!' },
             ],
         }, { username: 'Eve' })
@@ -135,8 +143,8 @@ describe('Handler.executeConfig', () => {
             ...baseConfig,
             reactions: [
                 { type: 'chat_reply', message: 'hi' },
-                { type: 'image', url: 'img.png' },
-                { type: 'sound', filename: 'snd.mp3' },
+                { type: 'image', url: 'https://example.com/img.png' },
+                { type: 'sound', filename: 'https://example.com/snd.mp3' },
             ],
         }, {})
         expect(mockOverlay.broadcast).toHaveBeenCalledTimes(1)
@@ -163,7 +171,7 @@ describe('Handler.setTwitchClient / setOverlayBroadcasterService', () => {
         handler.setOverlayBroadcasterService(overlay)
         await handler.executeConfig({
             ...baseConfig,
-            reactions: [{ type: 'image', url: 'x.png' }],
+            reactions: [{ type: 'image', url: 'https://example.com/x.png' }],
         }, {})
         expect(overlay.broadcast).toHaveBeenCalled()
     })
