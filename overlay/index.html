@@ -6,6 +6,40 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Twitch Command Overlay</title>
     <style>
+        #cache-indicator {
+            display: none;
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.82);
+            color: #fff;
+            padding: 12px 20px;
+            border-radius: 8px;
+            text-align: center;
+            min-width: 280px;
+            z-index: 9999;
+            font-family: sans-serif;
+            font-size: 13px;
+        }
+        #cache-indicator-bar-track {
+            background: #333;
+            border-radius: 4px;
+            height: 5px;
+            overflow: hidden;
+            margin: 8px 0 6px;
+        }
+        #cache-indicator-bar {
+            background: #9147ff;
+            height: 100%;
+            width: 0%;
+            transition: width 0.25s ease;
+        }
+        #cache-indicator-count {
+            color: #aaa;
+            font-size: 11px;
+        }
+
         body {
             margin: 0;
             padding: 0;
@@ -195,6 +229,13 @@
 
 <body>
     <div id="overlay-container"></div>
+    <div id="cache-indicator">
+        Assets are caching&hellip;
+        <div id="cache-indicator-bar-track">
+            <div id="cache-indicator-bar"></div>
+        </div>
+        <div id="cache-indicator-count"></div>
+    </div>
 
     <script>
         class TwitchOverlay {
@@ -277,12 +318,27 @@
                     case 'event':
                         this.displayEvent(data);
                         break;
+                    case 'cache_progress':
+                        this.updateCacheIndicator(data.current, data.total, data.done);
+                        break;
                     case 'clear':
                         this.clearDisplay();
                         break;
                     default:
                         console.log('Unknown message type:', data.type);
                 }
+            }
+
+            updateCacheIndicator(current, total, done) {
+                const indicator = document.getElementById('cache-indicator');
+                if (done) {
+                    indicator.style.display = 'none';
+                    return;
+                }
+                indicator.style.display = 'block';
+                const pct = total > 0 ? (current / total) * 100 : 0;
+                document.getElementById('cache-indicator-bar').style.width = pct + '%';
+                document.getElementById('cache-indicator-count').textContent = `${current} / ${total}`;
             }
 
             shouldQueue() {

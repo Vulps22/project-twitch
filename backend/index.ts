@@ -12,6 +12,7 @@ import sessionStats from './src/SessionStats.js';
 import eventLog from './src/EventLog.js';
 import eventStorage from './src/EventStorage.js';
 import viewerTracker from './src/ViewerTracker.js';
+import assetCacheService from './src/services/AssetCacheService.js';
 import { wss, dashboardWss, app } from './src/server.js';
 
 Logger.info('Starting Twitch project backend...');
@@ -27,6 +28,9 @@ try {
     overlayBroadcasterService = new OverlayBroadcasterService(wss);
     dashboardBroadcasterService = new DashboardBroadcasterService(dashboardWss);
     viewerTracker.setDashboardBroadcaster(dashboardBroadcasterService);
+    assetCacheService.setProgressCallback((current, total, done) => {
+        void overlayBroadcasterService!.broadcast({ type: 'cache_progress', current, total, done });
+    });
 
     if (process.env.TWITCH_ACCESS_TOKEN && process.env.TWITCH_CLIENT_ID) {
         eventRouter = new EventRouter(null, overlayBroadcasterService);

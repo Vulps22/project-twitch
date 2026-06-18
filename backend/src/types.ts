@@ -56,11 +56,20 @@ export interface TwitchRawEvent {
     event: Record<string, unknown>
 }
 
-export interface OverlayEvent {
+export interface OverlayReactionEvent {
     type: 'event'
     event_name: string
     reactions: OverlayReaction[]
 }
+
+export interface CacheProgressEvent {
+    type: 'cache_progress'
+    current: number
+    total: number
+    done: boolean
+}
+
+export type OverlayEvent = OverlayReactionEvent | CacheProgressEvent
 
 export interface DashboardChatEvent {
     type: 'chat'

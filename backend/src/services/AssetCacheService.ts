@@ -56,10 +56,21 @@ export function extractAssetUrls(configs: EventConfig[]): { url: string; assetTy
     return results;
 }
 
+type ProgressCallback = (current: number, total: number, done: boolean) => void;
+
 export class AssetCacheService {
     private state: CacheState = 'pending';
     private connectionCount = 0;
     private cleanupTimer: ReturnType<typeof setTimeout> | null = null;
+    private progressCallback: ProgressCallback | null = null;
+
+    setProgressCallback(cb: ProgressCallback): void {
+        this.progressCallback = cb;
+    }
+
+    private broadcastProgress(current: number, total: number, done: boolean): void {
+        this.progressCallback?.(current, total, done);
+    }
 
     private get channelHash(): string {
         return createHash('sha256')
@@ -84,6 +95,7 @@ export class AssetCacheService {
             Logger.info(`AssetCacheService: Cache ready at ${this.cacheDir}`);
         } catch (error) {
             this.state = 'error';
+            this.broadcastProgress(0, 0, true);
             Logger.error('AssetCacheService: Download failed, falling back to original URLs', error);
         }
     }
@@ -124,6 +136,11 @@ export class AssetCacheService {
         const assets = extractAssetUrls(configs);
         Logger.info(`AssetCacheService: Downloading ${assets.length} asset(s)`);
 
+        if (assets.length === 0) return;
+
+        this.broadcastProgress(0, assets.length, false);
+        let completed = 0;
+
         await Promise.all(assets.map(async ({ url, assetType }) => {
             const ext = extractExtension(url);
             if (!ext) { Logger.warn(`AssetCacheService: No extension for ${url}, skipping`); return; }
@@ -146,7 +163,12 @@ export class AssetCacheService {
             } catch (error) {
                 Logger.error(`AssetCacheService: Failed to download ${url}`, error);
             }
+
+            completed++;
+            this.broadcastProgress(completed, assets.length, false);
         }));
+
+        this.broadcastProgress(assets.length, assets.length, true);
     }
 
     private async cleanup(): Promise<void> {
