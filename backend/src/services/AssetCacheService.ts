@@ -43,6 +43,11 @@ function normalizeGoogleUrl(url: string): string {
 
 async function fetchAsset(url: string): Promise<Response> {
     const response = await fetch(url);
+
+    if (response.url.includes('accounts.google.com')) {
+        throw new Error('This Google Drive file requires sign-in. Set sharing to "Anyone on the internet with this link".');
+    }
+
     if (!response.ok) return response;
 
     const contentType = response.headers.get('content-type') ?? '';
