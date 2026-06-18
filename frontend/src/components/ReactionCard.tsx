@@ -61,7 +61,7 @@ export default function ReactionCard({ reaction, usedTypes, onChange, onRemove }
   }
 
   return (
-    <div className="card" style={{ padding: 14, marginBottom: 10, position: 'relative' }}>
+    <div className="card" style={{ padding: 18, marginBottom: 14, position: 'relative' }}>
       <button
         onClick={onRemove}
         style={{ position: 'absolute', top: 10, right: 10, background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 16, lineHeight: 1 }}
@@ -217,13 +217,13 @@ function PreviewBox({ url, assetType }: { url: string; assetType: 'image' | 'sou
         <div className="field-hint" style={{ color: 'var(--red)', marginTop: 6 }}>{error}</div>
       )}
       {state === 'done' && assetType === 'image' && (
-        <img src={cachedPath} alt="preview" style={{ maxHeight: 80, maxWidth: '100%', borderRadius: 4, marginTop: 6, objectFit: 'contain', display: 'block' }} />
+        <img src={cachedPath} alt="preview" style={{ maxHeight: 200, maxWidth: '100%', borderRadius: 4, marginTop: 8, objectFit: 'contain', display: 'block' }} />
       )}
       {state === 'done' && assetType === 'sound' && (
-        <audio src={cachedPath} controls style={{ width: '100%', marginTop: 6 }} />
+        <audio src={cachedPath} controls style={{ width: '100%', marginTop: 8 }} />
       )}
       {state === 'done' && assetType === 'video' && (
-        <video src={cachedPath} controls style={{ maxWidth: '100%', maxHeight: 120, marginTop: 6, borderRadius: 4, display: 'block' }} />
+        <video src={cachedPath} controls style={{ maxWidth: '100%', maxHeight: 200, marginTop: 8, borderRadius: 4, display: 'block' }} />
       )}
     </div>
   );
