@@ -9,24 +9,34 @@ import type { EventConfig } from '../types.js';
 type CacheState = 'pending' | 'downloading' | 'ready' | 'error';
 
 const ASSET_TYPES = {
-    image: { dir: 'img',   extensions: ['jpg', 'jpeg', 'png', 'gif'] },
-    sound: { dir: 'audio', extensions: ['mp3', 'm4a'] },
-    video: { dir: 'video', extensions: ['mp4'] },
+    image: { dir: 'img' },
+    sound: { dir: 'audio' },
+    video: { dir: 'video' },
 } as const;
 
 type AssetType = keyof typeof ASSET_TYPES;
+
+export const MIME_TO_EXT: Record<string, string> = {
+    'image/jpeg':    'jpg',
+    'image/png':     'png',
+    'image/gif':     'gif',
+    'audio/mpeg':    'mp3',
+    'audio/mp4':     'm4a',
+    'audio/x-m4a':  'm4a',
+    'video/mp4':     'mp4',
+};
+
+const ALLOWED_MIMES: Record<AssetType, string[]> = {
+    image: ['image/jpeg', 'image/png', 'image/gif'],
+    sound: ['audio/mpeg', 'audio/mp4', 'audio/x-m4a'],
+    video: ['video/mp4'],
+};
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const CACHE_ROOT = join(__dirname, '../../../../cache');
 
 export function isExternalUrl(value: string): boolean {
     return value.startsWith('http://') || value.startsWith('https://');
-}
-
-export function extractExtension(value: string): string | null {
-    const clean = value.split('?')[0].split('#')[0];
-    const dot = clean.lastIndexOf('.');
-    return dot >= 0 ? clean.slice(dot + 1).toLowerCase() : null;
 }
 
 export function extractAssetUrls(configs: EventConfig[]): { url: string; assetType: AssetType }[] {
@@ -63,6 +73,7 @@ export class AssetCacheService {
     private connectionCount = 0;
     private cleanupTimer: ReturnType<typeof setTimeout> | null = null;
     private progressCallback: ProgressCallback | null = null;
+    private urlExtensionMap = new Map<string, string>();
 
     setProgressCallback(cb: ProgressCallback): void {
         this.progressCallback = cb;
@@ -96,7 +107,7 @@ export class AssetCacheService {
         } catch (error) {
             this.state = 'error';
             this.broadcastProgress(0, 0, true);
-            Logger.error('AssetCacheService: Download failed, falling back to original URLs', error);
+            Logger.error('AssetCacheService: Download failed', error);
         }
     }
 
@@ -120,7 +131,7 @@ export class AssetCacheService {
     resolve(value: string, assetType: AssetType): string {
         if (!isExternalUrl(value) || this.state !== 'ready') return '';
 
-        const ext = extractExtension(value);
+        const ext = this.urlExtensionMap.get(value);
         if (!ext) return '';
 
         const { dir } = ASSET_TYPES[assetType];
@@ -142,24 +153,30 @@ export class AssetCacheService {
         let completed = 0;
 
         await Promise.all(assets.map(async ({ url, assetType }) => {
-            const ext = extractExtension(url);
-            if (!ext) { Logger.warn(`AssetCacheService: No extension for ${url}, skipping`); return; }
-
-            const { dir, extensions } = ASSET_TYPES[assetType];
-            if (!(extensions as readonly string[]).includes(ext)) {
-                Logger.warn(`AssetCacheService: Unsupported extension .${ext} for ${assetType}, skipping`);
-                return;
-            }
-
-            const filename = `${createHash('sha256').update(url).digest('hex').slice(0, 12)}.${ext}`;
-            const dest = join(this.cacheDir, dir, filename);
-
             try {
                 const response = await fetch(url);
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                const mimeType = response.headers.get('content-type')?.split(';')[0].trim() ?? '';
+                const ext = MIME_TO_EXT[mimeType];
+
+                if (!ext) {
+                    Logger.warn(`AssetCacheService: Unsupported content-type "${mimeType}" for ${url}, skipping`);
+                    return;
+                }
+                if (!ALLOWED_MIMES[assetType].includes(mimeType)) {
+                    Logger.warn(`AssetCacheService: "${mimeType}" not allowed for ${assetType} reaction, skipping`);
+                    return;
+                }
+
+                const { dir } = ASSET_TYPES[assetType];
+                const filename = `${createHash('sha256').update(url).digest('hex').slice(0, 12)}.${ext}`;
+                const dest = join(this.cacheDir, dir, filename);
+
                 const buffer = await response.arrayBuffer();
                 await writeFile(dest, Buffer.from(buffer));
-                Logger.info(`AssetCacheService: Cached ${url}`);
+                this.urlExtensionMap.set(url, ext);
+                Logger.info(`AssetCacheService: Cached ${url} as ${ext}`);
             } catch (error) {
                 Logger.error(`AssetCacheService: Failed to download ${url}`, error);
             }
@@ -178,6 +195,7 @@ export class AssetCacheService {
             }
             this.state = 'pending';
             this.cleanupTimer = null;
+            this.urlExtensionMap.clear();
             Logger.info(`AssetCacheService: Cache cleaned up`);
         } catch (error) {
             Logger.error('AssetCacheService: Cleanup failed', error);

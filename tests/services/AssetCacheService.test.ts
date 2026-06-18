@@ -17,11 +17,19 @@ vi.mock('fs', () => ({
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
-import { AssetCacheService, isExternalUrl, extractExtension, extractAssetUrls } from '../../backend/src/services/AssetCacheService.js';
+import { AssetCacheService, isExternalUrl, extractAssetUrls, MIME_TO_EXT } from '../../backend/src/services/AssetCacheService.js';
 import type { EventConfig } from '../../backend/src/types.js';
 
 function makeConfig(reactions: EventConfig['reactions']): EventConfig {
     return { event_name: 'test', event_type: 'follow', reactions };
+}
+
+function mockResponse(mimeType: string) {
+    return {
+        ok: true,
+        headers: { get: (h: string) => h === 'content-type' ? mimeType : null },
+        arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(8)),
+    };
 }
 
 describe('isExternalUrl', () => {
@@ -38,21 +46,21 @@ describe('isExternalUrl', () => {
     });
 });
 
-describe('extractExtension', () => {
-    it('extracts extension from plain filename', () => {
-        expect(extractExtension('image.png')).toBe('png');
+describe('MIME_TO_EXT', () => {
+    it('maps image types', () => {
+        expect(MIME_TO_EXT['image/jpeg']).toBe('jpg');
+        expect(MIME_TO_EXT['image/png']).toBe('png');
+        expect(MIME_TO_EXT['image/gif']).toBe('gif');
     });
 
-    it('extracts extension from URL ignoring query string', () => {
-        expect(extractExtension('https://example.com/file.jpg?raw=1')).toBe('jpg');
+    it('maps audio types', () => {
+        expect(MIME_TO_EXT['audio/mpeg']).toBe('mp3');
+        expect(MIME_TO_EXT['audio/mp4']).toBe('m4a');
+        expect(MIME_TO_EXT['audio/x-m4a']).toBe('m4a');
     });
 
-    it('returns null when no extension', () => {
-        expect(extractExtension('noext')).toBeNull();
-    });
-
-    it('lowercases extension', () => {
-        expect(extractExtension('FILE.PNG')).toBe('png');
+    it('maps video types', () => {
+        expect(MIME_TO_EXT['video/mp4']).toBe('mp4');
     });
 });
 
@@ -66,14 +74,12 @@ describe('extractAssetUrls', () => {
 
     it('finds external sound URLs', () => {
         const configs = [makeConfig([{ type: 'sound', filename: 'https://example.com/sound.mp3' }])];
-        const results = extractAssetUrls(configs);
-        expect(results[0]).toEqual({ url: 'https://example.com/sound.mp3', assetType: 'sound' });
+        expect(extractAssetUrls(configs)[0]).toEqual({ url: 'https://example.com/sound.mp3', assetType: 'sound' });
     });
 
     it('finds external video URLs', () => {
         const configs = [makeConfig([{ type: 'video', filename: 'https://example.com/clip.mp4' }])];
-        const results = extractAssetUrls(configs);
-        expect(results[0]).toEqual({ url: 'https://example.com/clip.mp4', assetType: 'video' });
+        expect(extractAssetUrls(configs)[0]).toEqual({ url: 'https://example.com/clip.mp4', assetType: 'video' });
     });
 
     it('skips local filenames', () => {
@@ -93,19 +99,14 @@ describe('extractAssetUrls', () => {
 
 describe('AssetCacheService', () => {
     let service: AssetCacheService;
-    const configs: EventConfig[] = [
-        makeConfig([{ type: 'image', url: 'https://example.com/img.png' }]),
-    ];
+    const imgUrl = 'https://example.com/img.png';
+    const configs: EventConfig[] = [makeConfig([{ type: 'image', url: imgUrl }])];
 
     beforeEach(() => {
         vi.clearAllMocks();
         vi.useFakeTimers();
         service = new AssetCacheService();
-
-        mockFetch.mockResolvedValue({
-            ok: true,
-            arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(8)),
-        });
+        mockFetch.mockResolvedValue(mockResponse('image/png'));
     });
 
     afterEach(() => {
@@ -118,50 +119,60 @@ describe('AssetCacheService', () => {
         });
 
         it('returns empty string when state is not ready', () => {
-            expect(service.resolve('https://example.com/img.png', 'image')).toBe('');
+            expect(service.resolve(imgUrl, 'image')).toBe('');
         });
 
-        it('returns cached path when state is ready', async () => {
+        it('returns cached path after successful download', async () => {
             await service.ensureReady(configs);
-            const result = service.resolve('https://example.com/img.png', 'image');
+            const result = service.resolve(imgUrl, 'image');
             expect(result).toMatch(/^\/cache\/[a-f0-9]+\/img\/[a-f0-9]+\.png$/);
         });
 
         it('returns same cached path for same URL', async () => {
             await service.ensureReady(configs);
-            const url = 'https://example.com/img.png';
-            expect(service.resolve(url, 'image')).toBe(service.resolve(url, 'image'));
+            expect(service.resolve(imgUrl, 'image')).toBe(service.resolve(imgUrl, 'image'));
+        });
+
+        it('returns empty string when download failed for that URL', async () => {
+            mockFetch.mockRejectedValue(new Error('Network error'));
+            await service.ensureReady(configs);
+            expect(service.resolve(imgUrl, 'image')).toBe('');
         });
     });
 
     describe('ensureReady', () => {
-        it('downloads assets and sets state to ready', async () => {
+        it('downloads assets using MIME type from Content-Type header', async () => {
             await service.ensureReady(configs);
             const { writeFile } = await import('fs/promises');
             expect(writeFile).toHaveBeenCalled();
+        });
+
+        it('skips assets with unsupported MIME type', async () => {
+            mockFetch.mockResolvedValue(mockResponse('image/bmp'));
+            await service.ensureReady(configs);
+            const { writeFile } = await import('fs/promises');
+            expect(writeFile).not.toHaveBeenCalled();
+        });
+
+        it('skips assets with wrong MIME type for reaction type', async () => {
+            const badConfigs = [makeConfig([{ type: 'image', url: imgUrl }])];
+            mockFetch.mockResolvedValue(mockResponse('video/mp4'));
+            await service.ensureReady(badConfigs);
+            const { writeFile } = await import('fs/promises');
+            expect(writeFile).not.toHaveBeenCalled();
         });
 
         it('skips download on second call when already ready', async () => {
             await service.ensureReady(configs);
             const { writeFile } = await import('fs/promises');
             const callCount = vi.mocked(writeFile).mock.calls.length;
-
             await service.ensureReady(configs);
             expect(vi.mocked(writeFile).mock.calls.length).toBe(callCount);
         });
 
-        it('skips unsupported extensions', async () => {
-            const badConfigs = [makeConfig([{ type: 'image', url: 'https://example.com/file.bmp' }])];
-            await service.ensureReady(badConfigs);
-            const { writeFile } = await import('fs/promises');
-            expect(writeFile).not.toHaveBeenCalled();
-        });
-
-        it('still returns cached path when individual download fails (browser handles 404)', async () => {
+        it('handles individual download failures gracefully', async () => {
             mockFetch.mockRejectedValue(new Error('Network error'));
-            await service.ensureReady(configs);
-            const result = service.resolve('https://example.com/img.png', 'image');
-            expect(result).toMatch(/^\/cache\/[a-f0-9]+\/img\/[a-f0-9]+\.png$/);
+            await expect(service.ensureReady(configs)).resolves.not.toThrow();
         });
     });
 
