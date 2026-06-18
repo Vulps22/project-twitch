@@ -312,7 +312,7 @@
                         case 'image': {
                             const img = document.createElement('img');
                             img.className = 'command-image';
-                            img.src = `/assets/img/${reaction.url}`;
+                            img.src = reaction.url;
                             img.alt = eventData.event_name || 'Event image';
                             if (reaction.transition_in) img.classList.add(reaction.transition_in);
                             img.onerror = () => console.warn(`Image not found: ${reaction.url}`);
@@ -325,7 +325,7 @@
                         case 'video': {
                             const video = document.createElement('video');
                             video.className = 'command-video';
-                            video.src = `/assets/video/${reaction.filename}`;
+                            video.src = reaction.filename;
                             video.autoplay = true;
                             video.muted = true;
                             video.loop = false;
@@ -390,7 +390,7 @@
 
             playSound(soundFile, volume) {
                 try {
-                    const audio = new Audio(`/assets/audio/${soundFile}`);
+                    const audio = new Audio(soundFile);
                     audio.volume = volume !== undefined ? volume : 0.5; // Use specified volume or default to 0.5
 
                     // Track audio in playing media
