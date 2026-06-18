@@ -12,7 +12,19 @@ const app: Express = express();
 const PORT = 3001;
 
 const server: Server = createServer(app);
-const wss = new WebSocketServer({ server });
+const wss = new WebSocketServer({ noServer: true });
+const dashboardWss = new WebSocketServer({ noServer: true });
+
+server.on('upgrade', (req, socket, head) => {
+    const pathname = req.url?.split('?')[0];
+    if (pathname === '/ws/overlay') {
+        wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
+    } else if (pathname === '/ws/dashboard') {
+        dashboardWss.handleUpgrade(req, socket, head, (ws) => dashboardWss.emit('connection', ws, req));
+    } else {
+        socket.destroy();
+    }
+});
 
 wss.on('connection', (ws) => {
     Logger.info('Overlay connected');
@@ -28,8 +40,15 @@ wss.on('connection', (ws) => {
     });
 });
 
+dashboardWss.on('connection', (ws) => {
+    Logger.info('Dashboard connected');
+    ws.on('close', () => Logger.info('Dashboard disconnected'));
+});
+
+app.use(express.json());
 app.use('/overlay', express.static(join(__dirname, '../../overlay')));
 app.use('/assets', express.static(join(__dirname, '../../assets')));
+app.use('/dashboard', express.static(join(__dirname, '../../dist/dashboard')));
 
 app.get('/', (_req: Request, res: Response) => {
     res.redirect('/overlay');
@@ -44,4 +63,4 @@ server.listen(PORT, () => {
     Logger.info(`WebSocket server ready on ws://localhost:${PORT}`);
 });
 
-export { wss, app, server };
+export { wss, dashboardWss, app, server };

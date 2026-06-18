@@ -86,6 +86,10 @@ export class EventSubSession {
         return this.sessionId;
     }
 
+    isConnected(): boolean {
+        return this.websocket?.readyState === WebSocket.OPEN && this.sessionId !== null;
+    }
+
     disconnect(): void {
         this.websocket?.close();
     }

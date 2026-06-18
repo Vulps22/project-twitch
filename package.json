@@ -17,8 +17,9 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc",
+    "build:frontend": "cd frontend && npm run build",
     "start": "npm run build && node dist/backend/index.js",
-    "dev": "tsx --watch backend/index.ts",
+    "dev": "rm -rf dist/dashboard && npm run build:frontend && tsx backend/index.ts",
     "start-fail": "node dist/backend/index.js",
     "auth:bot": "tsx auth.ts bot",
     "auth:streamer": "tsx auth.ts streamer",

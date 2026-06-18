@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const mockWss = { on: vi.fn(), clients: new Set() }
-const mockServer = { listen: vi.fn() }
+const mockServer = { listen: vi.fn(), on: vi.fn() }
 const mockApp = { use: vi.fn(), get: vi.fn() }
 
 vi.mock('ws', () => ({
@@ -14,8 +14,9 @@ vi.mock('http', () => ({
 
 vi.mock('express', () => {
     const app = { use: vi.fn(), get: vi.fn() }
-    const fn = vi.fn(() => app) as unknown as typeof import('express').default & { static: ReturnType<typeof vi.fn> }
+    const fn = vi.fn(() => app) as unknown as typeof import('express').default & { static: ReturnType<typeof vi.fn>; json: ReturnType<typeof vi.fn> }
     fn.static = vi.fn()
+    fn.json = vi.fn(() => ({}))
     return { default: fn }
 })
 
@@ -31,6 +32,7 @@ describe('server module', () => {
     it('exports wss, app, and server', async () => {
         const mod = await import('../../backend/src/server.js')
         expect(mod.wss).toBeDefined()
+        expect(mod.dashboardWss).toBeDefined()
         expect(mod.app).toBeDefined()
         expect(mod.server).toBeDefined()
     })

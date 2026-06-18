@@ -3,6 +3,7 @@ import { EVENTS } from '../../backend/config/events.js'
 
 const TRIGGER_REQUIRED_TYPES = new Set(['chat_command', 'chat_contains', 'channel_points_redemption'])
 const VALID_TYPES = new Set(['chat_command', 'chat_contains', 'follow', 'subscription', 'raid', 'bits', 'channel_points_redemption'])
+const VALID_REACTION_TYPES = new Set(['chat_reply', 'overlay_text', 'image', 'sound', 'video'])
 
 describe('EVENTS config', () => {
     it('exports a non-empty object', () => {
@@ -37,10 +38,26 @@ describe('EVENTS config', () => {
         expect(noTriggerEntries.length).toBeGreaterThan(0)
     })
 
+    it('every entry has a reactions array', () => {
+        for (const [key, config] of Object.entries(EVENTS)) {
+            expect(Array.isArray(config.reactions), `${key} missing reactions array`).toBe(true)
+        }
+    })
+
+    it('every reaction has a valid type', () => {
+        for (const [key, config] of Object.entries(EVENTS)) {
+            for (const reaction of config.reactions) {
+                expect(VALID_REACTION_TYPES.has(reaction.type), `${key} has unknown reaction type: ${reaction.type}`).toBe(true)
+            }
+        }
+    })
+
     it('timeout values are valid duration strings when present', () => {
         for (const [key, config] of Object.entries(EVENTS)) {
-            if (config.timeout !== undefined) {
-                expect(config.timeout, `${key} has invalid timeout format`).toMatch(/^\d+s$/)
+            for (const reaction of config.reactions) {
+                if ('timeout' in reaction && reaction.timeout !== undefined) {
+                    expect(reaction.timeout, `${key} reaction has invalid timeout format`).toMatch(/^\d+s$/)
+                }
             }
         }
     })

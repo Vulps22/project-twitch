@@ -17,12 +17,22 @@ gh issue list --state open
 ## Commands
 
 ```bash
-npm start          # Dev server with auto-reload (node --watch)
+npm start          # Clean build then serve (no watch)
+npm run dev        # Clean frontend build then serve backend
 npm run start-fail # Production start (no watch)
 npm run stream-check  # Verify streaming safety config
+npm test           # Run all tests once (vitest)
+npm run test:watch # Watch mode
 ```
 
-No test framework or linter is configured.
+## Testing
+
+Vitest is configured at the root. Tests live in `tests/` and mirror the `backend/src/` structure. Every new backend service or utility **must** have a corresponding test file — write tests in the same PR as the code.
+
+- Mock `Logger` in every test file that touches backend code (`vi.mock('../backend/src/utils/Logger.js', ...)`)
+- Singleton services (`EventLog`, `SessionStats`) must be `reset()` in `beforeEach`
+- Do not call `init()` on `EventRouter` in tests — inject `eventTypes` directly to bypass dynamic import
+- No linter is configured.
 
 ## Branch, Commit and PR Conventions
 
