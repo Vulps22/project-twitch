@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { Reaction } from '../../../backend/src/types.js';
 
 const ALL_REACTION_TYPES: Reaction['type'][] = ['chat_reply', 'overlay_text', 'image', 'sound', 'video'];
@@ -108,8 +109,9 @@ export default function ReactionCard({ reaction, usedTypes, onChange, onRemove }
             onChange={e => onChange({ ...reaction, url: convertGoogleUrl(e.target.value) })}
             placeholder="https://example.com/image.png"
           />
-          <AssetValidation value={reaction.url} assetType="image" />
+          <AssetValidation value={reaction.url} />
         </div>
+        <PreviewBox key={reaction.url} url={reaction.url} assetType="image" />
         <OffsetFields reaction={reaction} onChange={onChange} />
         <TransitionFields reaction={reaction} onChange={onChange} />
         <TimeoutField reaction={reaction} onChange={onChange} />
@@ -123,8 +125,9 @@ export default function ReactionCard({ reaction, usedTypes, onChange, onRemove }
             onChange={e => onChange({ ...reaction, filename: convertGoogleUrl(e.target.value) })}
             placeholder="https://example.com/sound.mp3"
           />
-          <AssetValidation value={reaction.filename} assetType="sound" />
+          <AssetValidation value={reaction.filename} />
         </div>
+        <PreviewBox key={reaction.filename} url={reaction.filename} assetType="sound" />
         <div className="field" style={{ marginBottom: 0 }}>
           <label>VOLUME (0–1)</label>
           <input
@@ -144,8 +147,9 @@ export default function ReactionCard({ reaction, usedTypes, onChange, onRemove }
             onChange={e => onChange({ ...reaction, filename: convertGoogleUrl(e.target.value) })}
             placeholder="https://example.com/clip.mp4"
           />
-          <AssetValidation value={reaction.filename} assetType="video" />
+          <AssetValidation value={reaction.filename} />
         </div>
+        <PreviewBox key={reaction.filename} url={reaction.filename} assetType="video" />
         <OffsetFields reaction={reaction} onChange={onChange} />
         <TransitionFields reaction={reaction} onChange={onChange} />
         <TimeoutField reaction={reaction} onChange={onChange} />
@@ -154,33 +158,74 @@ export default function ReactionCard({ reaction, usedTypes, onChange, onRemove }
   );
 }
 
-function AssetValidation({ value, assetType }: { value: string; assetType: 'image' | 'sound' | 'video' }) {
+function AssetValidation({ value }: { value: string }) {
   if (!value) return null;
   const error = validateAsset(value);
   if (error) return <div className="field-hint" style={{ color: 'var(--red)' }}>{error}</div>;
+  if (isGoogleUrl(value)) {
+    return (
+      <div className="field-hint" style={{ color: '#a970ff' }}>
+        Your Google URL will be converted to a downloadable URL
+      </div>
+    );
+  }
+  return null;
+}
+
+type PreviewState = 'idle' | 'loading' | 'done' | 'error';
+
+function PreviewBox({ url, assetType }: { url: string; assetType: 'image' | 'sound' | 'video' }) {
+  const [state, setState] = useState<PreviewState>('idle');
+  const [cachedPath, setCachedPath] = useState('');
+  const [error, setError] = useState('');
+
+  async function handlePreview() {
+    setState('loading');
+    setError('');
+    try {
+      const res = await fetch('/api/asset/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, assetType }),
+      });
+      const data = await res.json() as { path?: string; error?: string };
+      if (!res.ok) {
+        setError(data.error ?? 'Preview failed');
+        setState('error');
+      } else {
+        setCachedPath(data.path ?? '');
+        setState('done');
+      }
+    } catch {
+      setError('Network error');
+      setState('error');
+    }
+  }
+
+  const validUrl = url && !validateAsset(url);
 
   return (
-    <>
-      {isGoogleUrl(value) && (
-        <div className="field-hint" style={{ color: '#a970ff' }}>
-          Your Google URL will be converted to a downloadable URL
-        </div>
+    <div style={{ border: '1px solid var(--border)', borderRadius: 4, padding: 8, marginBottom: 12 }}>
+      <button
+        onClick={handlePreview}
+        disabled={!validUrl || state === 'loading'}
+        style={{ fontSize: 12, padding: '3px 10px' }}
+      >
+        {state === 'loading' ? 'Loading…' : 'Preview'}
+      </button>
+      {state === 'error' && (
+        <div className="field-hint" style={{ color: 'var(--red)', marginTop: 6 }}>{error}</div>
       )}
-      {assetType === 'image' && (
-        <img
-          key={value}
-          src={value}
-          alt="preview"
-          style={{ maxHeight: 80, maxWidth: '100%', borderRadius: 4, marginTop: 6, objectFit: 'contain', background: 'var(--bg)', display: 'block' }}
-          onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-          onLoad={e => { (e.target as HTMLImageElement).style.display = 'block'; }}
-        />
+      {state === 'done' && assetType === 'image' && (
+        <img src={cachedPath} alt="preview" style={{ maxHeight: 80, maxWidth: '100%', borderRadius: 4, marginTop: 6, objectFit: 'contain', display: 'block' }} />
       )}
-      {assetType === 'sound' && <audio key={value} src={value} controls style={{ width: '100%', marginTop: 6 }} />}
-      {assetType === 'video' && (
-        <video key={value} src={value} controls style={{ maxWidth: '100%', maxHeight: 120, marginTop: 6, borderRadius: 4, display: 'block' }} />
+      {state === 'done' && assetType === 'sound' && (
+        <audio src={cachedPath} controls style={{ width: '100%', marginTop: 6 }} />
       )}
-    </>
+      {state === 'done' && assetType === 'video' && (
+        <video src={cachedPath} controls style={{ maxWidth: '100%', maxHeight: 120, marginTop: 6, borderRadius: 4, display: 'block' }} />
+      )}
+    </div>
   );
 }
 

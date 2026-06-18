@@ -128,6 +128,44 @@ export class AssetCacheService {
         }
     }
 
+    invalidate(): void {
+        this.state = 'pending';
+        this.urlExtensionMap.clear();
+        Logger.info('AssetCacheService: Cache invalidated');
+    }
+
+    async previewUrl(url: string, assetType: AssetType): Promise<string> {
+        if (!isExternalUrl(url)) throw new Error('Must be an external URL');
+
+        const existingExt = this.urlExtensionMap.get(url);
+        if (existingExt) {
+            const { dir } = ASSET_TYPES[assetType];
+            const filename = `${createHash('sha256').update(url).digest('hex').slice(0, 12)}.${existingExt}`;
+            return `/cache/${this.channelHash}/${dir}/${filename}`;
+        }
+
+        await mkdir(join(this.cacheDir, ASSET_TYPES[assetType].dir), { recursive: true });
+
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const mimeType = response.headers.get('content-type')?.split(';')[0].trim() ?? '';
+        const ext = MIME_TO_EXT[mimeType];
+        if (!ext) throw new Error(`Unsupported content type: ${mimeType || '(none)'}`);
+        if (!ALLOWED_MIMES[assetType].includes(mimeType)) throw new Error(`"${mimeType}" is not valid for ${assetType}`);
+
+        const { dir } = ASSET_TYPES[assetType];
+        const filename = `${createHash('sha256').update(url).digest('hex').slice(0, 12)}.${ext}`;
+        const dest = join(this.cacheDir, dir, filename);
+
+        const buffer = await response.arrayBuffer();
+        await writeFile(dest, Buffer.from(buffer));
+        this.urlExtensionMap.set(url, ext);
+
+        Logger.info(`AssetCacheService: Previewed and cached ${url}`);
+        return `/cache/${this.channelHash}/${dir}/${filename}`;
+    }
+
     resolve(value: string, assetType: AssetType): string {
         if (!isExternalUrl(value) || this.state !== 'ready') return '';
 

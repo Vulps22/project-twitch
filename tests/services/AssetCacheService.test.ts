@@ -176,6 +176,58 @@ describe('AssetCacheService', () => {
         });
     });
 
+    describe('invalidate', () => {
+        it('resets state so ensureReady re-downloads on next call', async () => {
+            await service.ensureReady(configs);
+            service.invalidate();
+            vi.clearAllMocks();
+            await service.ensureReady(configs);
+            const { writeFile } = await import('fs/promises');
+            expect(writeFile).toHaveBeenCalled();
+        });
+
+        it('clears resolve results after invalidation', async () => {
+            await service.ensureReady(configs);
+            expect(service.resolve(imgUrl, 'image')).not.toBe('');
+            service.invalidate();
+            expect(service.resolve(imgUrl, 'image')).toBe('');
+        });
+    });
+
+    describe('previewUrl', () => {
+        it('downloads and returns a cached path', async () => {
+            const path = await service.previewUrl(imgUrl, 'image');
+            expect(path).toMatch(/^\/cache\/[a-f0-9]+\/img\/[a-f0-9]+\.png$/);
+        });
+
+        it('returns existing cached path without re-downloading', async () => {
+            await service.previewUrl(imgUrl, 'image');
+            const { writeFile } = await import('fs/promises');
+            const callsBefore = vi.mocked(writeFile).mock.calls.length;
+            await service.previewUrl(imgUrl, 'image');
+            expect(vi.mocked(writeFile).mock.calls.length).toBe(callsBefore);
+        });
+
+        it('throws for a local filename', async () => {
+            await expect(service.previewUrl('local.png', 'image')).rejects.toThrow('Must be an external URL');
+        });
+
+        it('throws for unsupported MIME type', async () => {
+            mockFetch.mockResolvedValue(mockResponse('image/bmp'));
+            await expect(service.previewUrl(imgUrl, 'image')).rejects.toThrow('Unsupported content type');
+        });
+
+        it('throws when MIME type does not match asset type', async () => {
+            mockFetch.mockResolvedValue(mockResponse('video/mp4'));
+            await expect(service.previewUrl(imgUrl, 'image')).rejects.toThrow('not valid for image');
+        });
+
+        it('throws on HTTP error', async () => {
+            mockFetch.mockResolvedValue({ ok: false, status: 404, headers: { get: () => null }, arrayBuffer: vi.fn() });
+            await expect(service.previewUrl(imgUrl, 'image')).rejects.toThrow('HTTP 404');
+        });
+    });
+
     describe('connection tracking', () => {
         it('cancels cleanup timer on reconnect', async () => {
             service.onConnect();

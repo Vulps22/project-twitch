@@ -139,6 +139,7 @@ app.post('/api/events', async (req: Request, res: Response) => {
         res.status(409).json({ error: 'Event already exists' });
         return;
     }
+    assetCacheService.invalidate();
     res.status(201).json({ ok: true });
 });
 
@@ -148,7 +149,26 @@ app.put('/api/events/:name', async (req: Request, res: Response) => {
         res.status(404).json({ error: 'Event not found' });
         return;
     }
+    assetCacheService.invalidate();
     res.json({ ok: true });
+});
+
+app.post('/api/asset/preview', async (req: Request, res: Response) => {
+    const { url, assetType } = req.body as { url?: string; assetType?: string };
+    if (!url || !assetType) {
+        res.status(400).json({ error: 'url and assetType are required' });
+        return;
+    }
+    if (!['image', 'sound', 'video'].includes(assetType)) {
+        res.status(400).json({ error: 'assetType must be image, sound, or video' });
+        return;
+    }
+    try {
+        const path = await assetCacheService.previewUrl(url, assetType as 'image' | 'sound' | 'video');
+        res.json({ path });
+    } catch (error) {
+        res.status(422).json({ error: error instanceof Error ? error.message : String(error) });
+    }
 });
 
 app.delete('/api/events/:name', async (req: Request, res: Response) => {
