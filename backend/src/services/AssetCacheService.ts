@@ -35,6 +35,12 @@ const ALLOWED_MIMES: Record<AssetType, string[]> = {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const CACHE_ROOT = join(__dirname, '../../../../cache');
 
+function normalizeGoogleUrl(url: string): string {
+    const ucMatch = url.match(/drive\.google\.com\/(?:open|uc)\?.*?[?&]id=([^&]+)/);
+    if (ucMatch) return `https://drive.usercontent.google.com/download?id=${ucMatch[1]}&export=download&authuser=0`;
+    return url;
+}
+
 export function isExternalUrl(value: string): boolean {
     return value.startsWith('http://') || value.startsWith('https://');
 }
@@ -137,6 +143,8 @@ export class AssetCacheService {
     async previewUrl(url: string, assetType: AssetType): Promise<string> {
         if (!isExternalUrl(url)) throw new Error('Must be an external URL');
 
+        const fetchUrl = normalizeGoogleUrl(url);
+
         const existingExt = this.urlExtensionMap.get(url);
         if (existingExt) {
             const { dir } = ASSET_TYPES[assetType];
@@ -146,7 +154,7 @@ export class AssetCacheService {
 
         await mkdir(join(this.cacheDir, ASSET_TYPES[assetType].dir), { recursive: true });
 
-        const response = await fetch(url);
+        const response = await fetch(fetchUrl);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
         const mimeType = response.headers.get('content-type')?.split(';')[0].trim() ?? '';
@@ -192,7 +200,7 @@ export class AssetCacheService {
 
         await Promise.all(assets.map(async ({ url, assetType }) => {
             try {
-                const response = await fetch(url);
+                const response = await fetch(normalizeGoogleUrl(url));
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
                 const mimeType = response.headers.get('content-type')?.split(';')[0].trim() ?? '';

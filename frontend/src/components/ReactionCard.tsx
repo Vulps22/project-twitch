@@ -34,16 +34,16 @@ function validateAsset(value: string): string | null {
 
 function convertGoogleUrl(value: string): string {
   const driveMatch = value.match(/drive\.google\.com\/file\/d\/([^/?#]+)/);
-  if (driveMatch) return `https://drive.google.com/uc?export=download&id=${driveMatch[1]}`;
+  if (driveMatch) return `https://drive.usercontent.google.com/download?id=${driveMatch[1]}&export=download&authuser=0`;
 
   const driveOpenMatch = value.match(/drive\.google\.com\/(?:open|uc)\?.*?[?&]id=([^&]+)/);
-  if (driveOpenMatch) return `https://drive.google.com/uc?export=download&id=${driveOpenMatch[1]}`;
+  if (driveOpenMatch) return `https://drive.usercontent.google.com/download?id=${driveOpenMatch[1]}&export=download&authuser=0`;
 
   return value;
 }
 
 function isGoogleUrl(value: string): boolean {
-  return /drive\.google\.com|photos\.google\.com/.test(value);
+  return /drive\.google\.com|drive\.usercontent\.google\.com|photos\.google\.com/.test(value);
 }
 
 interface Props {
