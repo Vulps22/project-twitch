@@ -15,6 +15,12 @@ const TRANSITION_OUT = ['', 'fade-out', 'bounce-out', 'scale-out', 'slide-right-
 
 const TEMPLATE_HINT = '{{username}}, {{display_name}}, {{count}}';
 
+const ALLOWED_EXTENSIONS = {
+  image: ['jpg', 'jpeg', 'png', 'gif'],
+  sound: ['mp3', 'm4a'],
+  video: ['mp4'],
+} as const;
+
 export function defaultReaction(type: Reaction['type']): Reaction {
   switch (type) {
     case 'chat_reply':   return { type: 'chat_reply', message: '' };
@@ -23,6 +29,22 @@ export function defaultReaction(type: Reaction['type']): Reaction {
     case 'sound':        return { type: 'sound', filename: '' };
     case 'video':        return { type: 'video', filename: '' };
   }
+}
+
+function getExt(value: string): string | null {
+  const clean = value.split('?')[0].split('#')[0];
+  const dot = clean.lastIndexOf('.');
+  return dot >= 0 ? clean.slice(dot + 1).toLowerCase() : null;
+}
+
+function validateAsset(value: string, type: keyof typeof ALLOWED_EXTENSIONS): string | null {
+  if (!value) return null;
+  if (!value.startsWith('http://') && !value.startsWith('https://')) return 'Must be a URL starting with http:// or https://';
+  const ext = getExt(value);
+  if (!ext) return 'Cannot determine file type from URL';
+  return (ALLOWED_EXTENSIONS[type] as readonly string[]).includes(ext)
+    ? null
+    : `Allowed types: ${ALLOWED_EXTENSIONS[type].join(', ')}`;
 }
 
 interface Props {
@@ -82,22 +104,14 @@ export default function ReactionCard({ reaction, usedTypes, onChange, onRemove }
 
       {reaction.type === 'image' && <>
         <div className="field">
-          <label>URL</label>
+          <label>URL OR FILENAME</label>
           <input
             value={reaction.url}
             onChange={e => onChange({ ...reaction, url: e.target.value })}
-            placeholder="lurk.png"
+            placeholder="https://example.com/image.png"
           />
+          <AssetValidation value={reaction.url} assetType="image" />
         </div>
-        {reaction.url && (
-          <img
-            src={`/assets/img/${reaction.url}`}
-            alt="preview"
-            style={{ maxHeight: 80, maxWidth: '100%', borderRadius: 4, marginBottom: 12, objectFit: 'contain', background: 'var(--bg)' }}
-            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-            onLoad={e => { (e.target as HTMLImageElement).style.display = 'block'; }}
-          />
-        )}
         <OffsetFields reaction={reaction} onChange={onChange} />
         <TransitionFields reaction={reaction} onChange={onChange} />
         <TimeoutField reaction={reaction} onChange={onChange} />
@@ -105,12 +119,13 @@ export default function ReactionCard({ reaction, usedTypes, onChange, onRemove }
 
       {reaction.type === 'sound' && <>
         <div className="field">
-          <label>FILENAME</label>
+          <label>URL OR FILENAME</label>
           <input
             value={reaction.filename}
             onChange={e => onChange({ ...reaction, filename: e.target.value })}
-            placeholder="sound.mp3"
+            placeholder="https://example.com/sound.mp3"
           />
+          <AssetValidation value={reaction.filename} assetType="sound" />
         </div>
         <div className="field" style={{ marginBottom: 0 }}>
           <label>VOLUME (0–1)</label>
@@ -125,12 +140,13 @@ export default function ReactionCard({ reaction, usedTypes, onChange, onRemove }
 
       {reaction.type === 'video' && <>
         <div className="field">
-          <label>FILENAME</label>
+          <label>URL OR FILENAME</label>
           <input
             value={reaction.filename}
             onChange={e => onChange({ ...reaction, filename: e.target.value })}
-            placeholder="video.mp4"
+            placeholder="https://example.com/clip.mp4"
           />
+          <AssetValidation value={reaction.filename} assetType="video" />
         </div>
         <OffsetFields reaction={reaction} onChange={onChange} />
         <TransitionFields reaction={reaction} onChange={onChange} />
@@ -138,6 +154,41 @@ export default function ReactionCard({ reaction, usedTypes, onChange, onRemove }
       </>}
     </div>
   );
+}
+
+function AssetValidation({ value, assetType }: { value: string; assetType: keyof typeof ALLOWED_EXTENSIONS }) {
+  if (!value) return null;
+  const error = validateAsset(value, assetType);
+  if (error) return <div className="field-hint" style={{ color: 'var(--red)' }}>{error}</div>;
+
+  if (assetType === 'image') {
+    return (
+      <img
+        src={value}
+        alt="preview"
+        style={{ maxHeight: 80, maxWidth: '100%', borderRadius: 4, marginTop: 6, objectFit: 'contain', background: 'var(--bg)', display: 'block' }}
+        onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+        onLoad={e => { (e.target as HTMLImageElement).style.display = 'block'; }}
+      />
+    );
+  }
+
+  if (assetType === 'sound') {
+    return <audio key={value} src={value} controls style={{ width: '100%', marginTop: 6 }} />;
+  }
+
+  if (assetType === 'video') {
+    return (
+      <video
+        key={value}
+        src={value}
+        controls
+        style={{ maxWidth: '100%', maxHeight: 120, marginTop: 6, borderRadius: 4, display: 'block' }}
+      />
+    );
+  }
+
+  return null;
 }
 
 type WithTransitions = { transition_in?: string; transition_out?: string };
