@@ -32,6 +32,48 @@ const ALLOWED_MIMES: Record<AssetType, string[]> = {
     video: ['video/mp4'],
 };
 
+// Hosts like Dropbox serve files with a generic/opaque Content-Type; for these
+// we ignore the header and detect the real type from the bytes or URL instead.
+const GENERIC_MIMES = new Set([
+    '', 'application/binary', 'application/octet-stream',
+    'binary/octet-stream', 'application/download',
+]);
+
+const EXT_TO_MIME: Record<string, string> = {
+    jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif',
+    mp3: 'audio/mpeg', m4a: 'audio/x-m4a', mp4: 'video/mp4',
+};
+
+function sniffMime(buffer: Buffer): string | undefined {
+    const b = buffer;
+    if (b.length >= 4 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return 'image/png';
+    if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
+    if (b.length >= 6 && (b.toString('ascii', 0, 6) === 'GIF87a' || b.toString('ascii', 0, 6) === 'GIF89a')) return 'image/gif';
+    if (b.length >= 3 && b.toString('ascii', 0, 3) === 'ID3') return 'audio/mpeg';
+    if (b.length >= 2 && b[0] === 0xff && (b[1] & 0xe0) === 0xe0) return 'audio/mpeg';
+    if (b.length >= 12 && b.toString('ascii', 4, 8) === 'ftyp') {
+        return b.toString('ascii', 8, 11) === 'M4A' ? 'audio/mp4' : 'video/mp4';
+    }
+    return undefined;
+}
+
+function mimeFromUrlExt(url: string): string | undefined {
+    const ext = url.split(/[?#]/)[0].split('.').pop()?.toLowerCase();
+    return ext ? EXT_TO_MIME[ext] : undefined;
+}
+
+/**
+ * Resolve the canonical MIME type for a downloaded asset. A specific, known
+ * Content-Type is trusted; a specific-but-unsupported one is rejected; a
+ * generic one (e.g. Dropbox's application/binary) is resolved by sniffing the
+ * magic bytes, then falling back to the URL's file extension.
+ */
+export function resolveAssetMime(headerMime: string, buffer: Buffer, url: string): string | undefined {
+    if (MIME_TO_EXT[headerMime]) return headerMime;
+    if (!GENERIC_MIMES.has(headerMime)) return undefined;
+    return sniffMime(buffer) ?? mimeFromUrlExt(url);
+}
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const CACHE_ROOT = join(__dirname, '../../../../cache');
 
@@ -187,17 +229,19 @@ export class AssetCacheService {
         const response = await fetchAsset(fetchUrl);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-        const mimeType = response.headers.get('content-type')?.split(';')[0].trim() ?? '';
-        const ext = MIME_TO_EXT[mimeType];
-        if (!ext) throw new Error(`Unsupported content type: ${mimeType || '(none)'}`);
+        const headerMime = response.headers.get('content-type')?.split(';')[0].trim() ?? '';
+        const buffer = Buffer.from(await response.arrayBuffer());
+        const mimeType = resolveAssetMime(headerMime, buffer, url);
+
+        if (!mimeType) throw new Error(`Unsupported content type: ${headerMime || '(none)'}`);
         if (!ALLOWED_MIMES[assetType].includes(mimeType)) throw new Error(`"${mimeType}" is not valid for ${assetType}`);
 
+        const ext = MIME_TO_EXT[mimeType];
         const { dir } = ASSET_TYPES[assetType];
         const filename = `${createHash('sha256').update(url).digest('hex').slice(0, 12)}.${ext}`;
         const dest = join(this.cacheDir, dir, filename);
 
-        const buffer = await response.arrayBuffer();
-        await writeFile(dest, Buffer.from(buffer));
+        await writeFile(dest, buffer);
         this.urlExtensionMap.set(url, ext);
 
         Logger.info(`AssetCacheService: Previewed and cached ${url}`);
@@ -233,11 +277,12 @@ export class AssetCacheService {
                 const response = await fetchAsset(normalizeGoogleUrl(url));
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-                const mimeType = response.headers.get('content-type')?.split(';')[0].trim() ?? '';
-                const ext = MIME_TO_EXT[mimeType];
+                const headerMime = response.headers.get('content-type')?.split(';')[0].trim() ?? '';
+                const buffer = Buffer.from(await response.arrayBuffer());
+                const mimeType = resolveAssetMime(headerMime, buffer, url);
 
-                if (!ext) {
-                    Logger.warn(`AssetCacheService: Unsupported content-type "${mimeType}" for ${url}, skipping`);
+                if (!mimeType) {
+                    Logger.warn(`AssetCacheService: Unsupported content-type "${headerMime}" for ${url}, skipping`);
                     return;
                 }
                 if (!ALLOWED_MIMES[assetType].includes(mimeType)) {
@@ -245,12 +290,12 @@ export class AssetCacheService {
                     return;
                 }
 
+                const ext = MIME_TO_EXT[mimeType];
                 const { dir } = ASSET_TYPES[assetType];
                 const filename = `${createHash('sha256').update(url).digest('hex').slice(0, 12)}.${ext}`;
                 const dest = join(this.cacheDir, dir, filename);
 
-                const buffer = await response.arrayBuffer();
-                await writeFile(dest, Buffer.from(buffer));
+                await writeFile(dest, buffer);
                 this.urlExtensionMap.set(url, ext);
                 Logger.info(`AssetCacheService: Cached ${url} as ${ext}`);
             } catch (error) {

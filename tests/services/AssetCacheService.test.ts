@@ -17,19 +17,23 @@ vi.mock('fs', () => ({
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
-import { AssetCacheService, isExternalUrl, extractAssetUrls, MIME_TO_EXT } from '../../backend/src/services/AssetCacheService.js';
+import { AssetCacheService, isExternalUrl, extractAssetUrls, MIME_TO_EXT, resolveAssetMime } from '../../backend/src/services/AssetCacheService.js';
 import type { EventConfig } from '../../backend/src/types.js';
+
+const PNG_BYTES = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const JPEG_BYTES = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46]);
+const GIF_BYTES = new Uint8Array([0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x00, 0x00]);
 
 function makeConfig(reactions: EventConfig['reactions']): EventConfig {
     return { event_name: 'test', event_type: 'follow', reactions };
 }
 
-function mockResponse(mimeType: string, url = '') {
+function mockResponse(mimeType: string, url = '', bytes: Uint8Array = new Uint8Array(8)) {
     return {
         ok: true,
         url,
         headers: { get: (h: string) => h === 'content-type' ? mimeType : null },
-        arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(8)),
+        arrayBuffer: vi.fn().mockResolvedValue(bytes.buffer),
     };
 }
 
@@ -62,6 +66,36 @@ describe('MIME_TO_EXT', () => {
 
     it('maps video types', () => {
         expect(MIME_TO_EXT['video/mp4']).toBe('mp4');
+    });
+});
+
+describe('resolveAssetMime', () => {
+    const b = (bytes: Uint8Array) => Buffer.from(bytes);
+
+    it('trusts a known, specific Content-Type header', () => {
+        expect(resolveAssetMime('image/png', b(new Uint8Array(8)), 'https://x/y.bin')).toBe('image/png');
+    });
+
+    it('rejects a specific but unsupported Content-Type without falling back', () => {
+        expect(resolveAssetMime('image/bmp', b(PNG_BYTES), 'https://x/y.png')).toBeUndefined();
+    });
+
+    it('sniffs PNG magic bytes when the header is generic', () => {
+        expect(resolveAssetMime('application/binary', b(PNG_BYTES), 'https://x/file')).toBe('image/png');
+    });
+
+    it('sniffs JPEG and GIF magic bytes', () => {
+        expect(resolveAssetMime('application/octet-stream', b(JPEG_BYTES), 'https://x/file')).toBe('image/jpeg');
+        expect(resolveAssetMime('', b(GIF_BYTES), 'https://x/file')).toBe('image/gif');
+    });
+
+    it('falls back to the URL extension when bytes are unrecognized', () => {
+        expect(resolveAssetMime('application/binary', b(new Uint8Array(8)), 'https://www.dropbox.com/s/abc/lurk.png?dl=1')).toBe('image/png');
+        expect(resolveAssetMime('application/binary', b(new Uint8Array(8)), 'https://x/clip.mp4')).toBe('video/mp4');
+    });
+
+    it('returns undefined when generic with no usable bytes or extension', () => {
+        expect(resolveAssetMime('application/binary', b(new Uint8Array(8)), 'https://x/file')).toBeUndefined();
     });
 });
 
@@ -221,6 +255,19 @@ describe('AssetCacheService', () => {
         it('throws when MIME type does not match asset type', async () => {
             mockFetch.mockResolvedValue(mockResponse('video/mp4'));
             await expect(service.previewUrl(imgUrl, 'image')).rejects.toThrow('not valid for image');
+        });
+
+        it('caches a generic application/binary response by sniffing magic bytes', async () => {
+            mockFetch.mockResolvedValue(mockResponse('application/binary', '', PNG_BYTES));
+            const path = await service.previewUrl(imgUrl, 'image');
+            expect(path).toMatch(/^\/cache\/[a-f0-9]+\/img\/[a-f0-9]+\.png$/);
+        });
+
+        it('caches a generic response by URL extension when bytes are unrecognized', async () => {
+            const dropboxUrl = 'https://www.dropbox.com/scl/fi/abc/lurk.png?dl=1';
+            mockFetch.mockResolvedValue(mockResponse('application/binary', '', new Uint8Array(8)));
+            const path = await service.previewUrl(dropboxUrl, 'image');
+            expect(path).toMatch(/^\/cache\/[a-f0-9]+\/img\/[a-f0-9]+\.png$/);
         });
 
         it('throws on HTTP error', async () => {
