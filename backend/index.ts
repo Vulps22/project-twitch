@@ -140,6 +140,7 @@ app.post('/api/events', async (req: Request, res: Response) => {
         return;
     }
     assetCacheService.invalidate();
+    void assetCacheService.ensureReady(eventStorage.getAll());
     res.status(201).json({ ok: true });
 });
 
@@ -150,6 +151,7 @@ app.put('/api/events/:name', async (req: Request, res: Response) => {
         return;
     }
     assetCacheService.invalidate();
+    void assetCacheService.ensureReady(eventStorage.getAll());
     res.json({ ok: true });
 });
 
