@@ -460,6 +460,15 @@
                 }
 
                 if (this.currentDisplay) {
+                    // In-DOM media (videos) won't fire onended once removed, so they'd
+                    // leak into playingMedia and permanently gate queueing. Drop them here.
+                    this.playingMedia = this.playingMedia.filter(media => {
+                        if (media instanceof HTMLElement && this.currentDisplay.contains(media)) {
+                            media.pause();
+                            return false;
+                        }
+                        return true;
+                    });
                     this.currentDisplay.remove();
                     this.currentDisplay = null;
                 }
