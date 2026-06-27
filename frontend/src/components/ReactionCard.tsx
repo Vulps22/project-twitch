@@ -42,8 +42,16 @@ function convertGoogleUrl(value: string): string {
   return value;
 }
 
+function convertUrl(value: string): string {
+  return convertGoogleUrl(value).replace(/([?&])dl=0\b/, '$1dl=1');
+}
+
 function isGoogleUrl(value: string): boolean {
   return /drive\.google\.com|drive\.usercontent\.google\.com|photos\.google\.com/.test(value);
+}
+
+function wasDownloadConverted(value: string): boolean {
+  return /[?&]dl=1/.test(value);
 }
 
 interface Props {
@@ -106,7 +114,7 @@ export default function ReactionCard({ reaction, usedTypes, onChange, onRemove }
           <label>URL</label>
           <input
             value={reaction.url}
-            onChange={e => onChange({ ...reaction, url: convertGoogleUrl(e.target.value) })}
+            onChange={e => onChange({ ...reaction, url: convertUrl(e.target.value) })}
             placeholder="https://example.com/image.png"
           />
           <AssetValidation value={reaction.url} />
@@ -122,7 +130,7 @@ export default function ReactionCard({ reaction, usedTypes, onChange, onRemove }
           <label>URL</label>
           <input
             value={reaction.filename}
-            onChange={e => onChange({ ...reaction, filename: convertGoogleUrl(e.target.value) })}
+            onChange={e => onChange({ ...reaction, filename: convertUrl(e.target.value) })}
             placeholder="https://example.com/sound.mp3"
           />
           <AssetValidation value={reaction.filename} />
@@ -144,7 +152,7 @@ export default function ReactionCard({ reaction, usedTypes, onChange, onRemove }
           <label>URL</label>
           <input
             value={reaction.filename}
-            onChange={e => onChange({ ...reaction, filename: convertGoogleUrl(e.target.value) })}
+            onChange={e => onChange({ ...reaction, filename: convertUrl(e.target.value) })}
             placeholder="https://example.com/clip.mp4"
           />
           <AssetValidation value={reaction.filename} />
@@ -166,6 +174,13 @@ function AssetValidation({ value }: { value: string }) {
     return (
       <div className="field-hint" style={{ color: '#a970ff' }}>
         Your Google URL will be converted to a downloadable URL
+      </div>
+    );
+  }
+  if (wasDownloadConverted(value)) {
+    return (
+      <div className="field-hint" style={{ color: '#a970ff' }}>
+        URL updated to dl=1 to support direct downloading
       </div>
     );
   }
