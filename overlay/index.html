@@ -526,15 +526,14 @@
             parseTimeout(timeoutStr) {
                 if (!timeoutStr) return null;
 
-                // Parse timeout strings like "5s", "2000ms", "3000"
+                // Parse timeout strings like "5s", "2000ms". A bare number is seconds
+                // (the editor is seconds-based, e.g. "6s") — so "5" means 5s, not 5ms.
                 if (typeof timeoutStr === 'number') return timeoutStr;
                 if (typeof timeoutStr === 'string') {
-                    if (timeoutStr.endsWith('s')) {
-                        return parseFloat(timeoutStr) * 1000;
-                    } else if (timeoutStr.endsWith('ms')) {
+                    if (timeoutStr.endsWith('ms')) {
                         return parseFloat(timeoutStr);
                     } else {
-                        return parseFloat(timeoutStr);
+                        return parseFloat(timeoutStr) * 1000;
                     }
                 }
                 return null;
