@@ -152,6 +152,12 @@ Template variables: `{{username}}`, `{{count}}`, `{{display_name}}`, `{{followed
   transition_in?, transition_out?, timeout? }
 ```
 
+## Docker
+
+Docker Hub: [vulps23/project-commander](https://hub.docker.com/repository/docker/vulps23/project-commander/general)
+
+Run with `docker compose up --build`. The `assets/` directory is mounted as a volume so content can be updated without rebuilding.
+
 ## Environment
 
 Copy `.env.example` to `.env`:
@@ -160,7 +166,8 @@ Copy `.env.example` to `.env`:
 TWITCH_CLIENT_ID
 TWITCH_ACCESS_TOKEN   # scopes: user:read:chat, channel:read:subscriptions, moderator:read:followers, user:write:chat, channel:read:redemptions
 TWITCH_CHANNEL_NAME
-PORT                  # default 3000
+TWITCH_BROADCASTER_TOKEN
+PORT                  # required — no default; must be set explicitly
 ```
 
 ## Known Issues

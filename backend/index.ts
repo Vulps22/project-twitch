@@ -6,18 +6,23 @@ import { TwitchClient } from './src/twitch-client.js';
 import { EventRouter } from './src/EventRouter.js';
 import OverlayBroadcasterService from './src/services/OverlayBroadcasterService.js';
 import DashboardBroadcasterService from './src/services/DashboardBroadcasterService.js';
-import { EVENTS } from './config/events.js';
 import Logger from './src/utils/Logger.js';
 import sessionStats from './src/SessionStats.js';
 import eventLog from './src/EventLog.js';
 import eventStorage from './src/EventStorage.js';
 import viewerTracker from './src/ViewerTracker.js';
 import assetCacheService from './src/services/AssetCacheService.js';
-import { wss, dashboardWss, app } from './src/server.js';
+import { wss, dashboardWss, app, requireAuth } from './src/server.js';
 
 Logger.info('Starting Twitch project backend...');
 
 await eventStorage.load();
+
+// Protect all API routes — overlay-log is excluded as it's called by the unauthenticated OBS browser source
+app.use('/api', (req: Request, res: Response, next) => {
+    if (req.path === '/overlay-log') { next(); return; }
+    requireAuth(req, res, next);
+});
 
 let twitchClient: TwitchClient | null = null;
 let overlayBroadcasterService: OverlayBroadcasterService | null = null;
@@ -35,7 +40,7 @@ try {
     if (process.env.TWITCH_ACCESS_TOKEN && process.env.TWITCH_CLIENT_ID) {
         eventRouter = new EventRouter(null, overlayBroadcasterService);
         await eventRouter.init();
-        eventRouter.setConfigs(EVENTS);
+        eventRouter.setConfigs(eventStorage.getAll());
 
         twitchClient = new TwitchClient({
             accessToken: process.env.TWITCH_ACCESS_TOKEN,
@@ -124,6 +129,10 @@ app.post('/api/events/:name/test', async (req: Request, res: Response) => {
     res.json({ ok: true });
 });
 
+function syncRouter(): void {
+    eventRouter?.setConfigs(eventStorage.getAll());
+}
+
 app.get('/api/events', (_req: Request, res: Response) => {
     res.json(eventStorage.getAll());
 });
@@ -139,17 +148,19 @@ app.post('/api/events', async (req: Request, res: Response) => {
         res.status(409).json({ error: 'Event already exists' });
         return;
     }
+    syncRouter();
     assetCacheService.invalidate();
     void assetCacheService.ensureReady(eventStorage.getAll());
     res.status(201).json({ ok: true });
 });
 
 app.put('/api/events/:name', async (req: Request, res: Response) => {
-    const updated = await eventStorage.update(req.params.name, req.body);
+    const updated = await eventStorage.update(String(req.params.name), req.body);
     if (!updated) {
         res.status(404).json({ error: 'Event not found' });
         return;
     }
+    syncRouter();
     assetCacheService.invalidate();
     void assetCacheService.ensureReady(eventStorage.getAll());
     res.json({ ok: true });
@@ -174,11 +185,12 @@ app.post('/api/asset/preview', async (req: Request, res: Response) => {
 });
 
 app.delete('/api/events/:name', async (req: Request, res: Response) => {
-    const deleted = await eventStorage.delete(req.params.name);
+    const deleted = await eventStorage.delete(String(req.params.name));
     if (!deleted) {
         res.status(404).json({ error: 'Event not found' });
         return;
     }
+    syncRouter();
     res.json({ ok: true });
 });
 
@@ -193,14 +205,14 @@ app.post('/api/mod/timeout/:userId', async (req: Request, res: Response) => {
         res.status(400).json({ error: 'duration must be a positive number' });
         return;
     }
-    await twitchClient.timeout(req.params.userId, duration);
+    await twitchClient.timeout(String(req.params.userId), duration);
     res.json({ ok: true });
 });
 
 app.post('/api/mod/ban/:userId', async (req: Request, res: Response) => {
     if (!twitchClient) { res.status(503).json({ error: 'Twitch client not connected' }); return; }
     const { reason } = req.body as { reason?: string };
-    await twitchClient.ban(req.params.userId, reason);
+    await twitchClient.ban(String(req.params.userId), reason);
     res.json({ ok: true });
 });
 

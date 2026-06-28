@@ -2,7 +2,6 @@ import { readFile, writeFile, mkdir } from 'fs/promises';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import type { EventConfig } from './types.js';
-import { EVENTS } from '../config/events.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_PATH = join(__dirname, '../../data/events.json');
@@ -17,8 +16,7 @@ export class EventStorage {
             this.events = JSON.parse(raw);
         } catch (err: unknown) {
             if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
-            this.events = { ...EVENTS };
-            await this.persist();
+            this.events = {};
         }
         this.loaded = true;
     }
