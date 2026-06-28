@@ -26,6 +26,8 @@ export interface SoundReaction {
     type: 'sound'
     filename: string
     volume?: number
+    startTime?: number
+    endTime?: number
 }
 
 export interface VideoReaction {
@@ -36,7 +38,8 @@ export interface VideoReaction {
     offsetZ?: number
     transition_in?: string
     transition_out?: string
-    timeout?: string
+    startTime?: number
+    endTime?: number
 }
 
 export type OverlayReaction = OverlayTextReaction | ImageReaction | SoundReaction | VideoReaction

@@ -136,7 +136,7 @@ export default function ReactionCard({ reaction, usedTypes, onChange, onRemove }
           <AssetValidation value={reaction.filename} />
         </div>
         <PreviewBox key={reaction.filename} url={reaction.filename} assetType="sound" />
-        <div className="field" style={{ marginBottom: 0 }}>
+        <div className="field" style={{ marginBottom: 12 }}>
           <label>VOLUME (0–1)</label>
           <input
             type="number"
@@ -145,6 +145,7 @@ export default function ReactionCard({ reaction, usedTypes, onChange, onRemove }
             onChange={e => onChange({ ...reaction, volume: parseFloat(e.target.value) })}
           />
         </div>
+        <TrimFields reaction={reaction} onChange={onChange} />
       </>}
 
       {reaction.type === 'video' && <>
@@ -160,7 +161,7 @@ export default function ReactionCard({ reaction, usedTypes, onChange, onRemove }
         <PreviewBox key={reaction.filename} url={reaction.filename} assetType="video" />
         <OffsetFields reaction={reaction} onChange={onChange} />
         <TransitionFields reaction={reaction} onChange={onChange} />
-        <TimeoutField reaction={reaction} onChange={onChange} />
+        <TrimFields reaction={reaction} onChange={onChange} />
       </>}
     </div>
   );
@@ -247,6 +248,7 @@ function PreviewBox({ url, assetType }: { url: string; assetType: 'image' | 'sou
 type WithTransitions = { transition_in?: string; transition_out?: string };
 type WithTimeout     = { timeout?: string };
 type WithOffsets     = { offsetX?: number; offsetY?: number; offsetZ?: number };
+type WithTrim        = { startTime?: number; endTime?: number };
 
 function TransitionFields<T extends WithTransitions>({ reaction, onChange }: { reaction: T; onChange: (r: T) => void }) {
   return (
@@ -294,6 +296,34 @@ function OffsetFields<T extends WithOffsets>({ reaction, onChange }: { reaction:
           />
         </div>
       ))}
+    </div>
+  );
+}
+
+function TrimFields<T extends WithTrim>({ reaction, onChange }: { reaction: T; onChange: (r: T) => void }) {
+  const parse = (v: string) => (v === '' ? undefined : Math.max(0, parseFloat(v)));
+  return (
+    <div className="field-row" style={{ marginBottom: 0 }}>
+      <div className="field" style={{ marginBottom: 0 }}>
+        <label>START (s)</label>
+        <input
+          type="number"
+          min={0} step={0.1}
+          value={reaction.startTime ?? ''}
+          onChange={e => onChange({ ...reaction, startTime: parse(e.target.value) })}
+          placeholder="0"
+        />
+      </div>
+      <div className="field" style={{ marginBottom: 0 }}>
+        <label>END (s)</label>
+        <input
+          type="number"
+          min={0} step={0.1}
+          value={reaction.endTime ?? ''}
+          onChange={e => onChange({ ...reaction, endTime: parse(e.target.value) })}
+          placeholder="(end of clip)"
+        />
+      </div>
     </div>
   );
 }
