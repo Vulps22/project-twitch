@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { Reaction } from '../../../backend/src/types.js';
 
 const ALL_REACTION_TYPES: Reaction['type'][] = ['chat_reply', 'overlay_text', 'image', 'sound', 'video'];
@@ -25,6 +26,34 @@ export function defaultReaction(type: Reaction['type']): Reaction {
   }
 }
 
+function validateAsset(value: string): string | null {
+  if (!value) return null;
+  if (!value.startsWith('http://') && !value.startsWith('https://')) return 'Must be a URL starting with http:// or https://';
+  return null;
+}
+
+function convertGoogleUrl(value: string): string {
+  const driveMatch = value.match(/drive\.google\.com\/file\/d\/([^/?#]+)/);
+  if (driveMatch) return `https://drive.usercontent.google.com/download?id=${driveMatch[1]}&export=download&authuser=0`;
+
+  const driveOpenMatch = value.match(/drive\.google\.com\/(?:open|uc)\?.*?[?&]id=([^&]+)/);
+  if (driveOpenMatch) return `https://drive.usercontent.google.com/download?id=${driveOpenMatch[1]}&export=download&authuser=0`;
+
+  return value;
+}
+
+function convertUrl(value: string): string {
+  return convertGoogleUrl(value).replace(/([?&])dl=0\b/, '$1dl=1');
+}
+
+function isGoogleUrl(value: string): boolean {
+  return /drive\.google\.com|drive\.usercontent\.google\.com|photos\.google\.com/.test(value);
+}
+
+function wasDownloadConverted(value: string): boolean {
+  return /[?&]dl=1/.test(value);
+}
+
 interface Props {
   reaction: Reaction;
   usedTypes: Set<Reaction['type']>;
@@ -40,7 +69,7 @@ export default function ReactionCard({ reaction, usedTypes, onChange, onRemove }
   }
 
   return (
-    <div className="card" style={{ padding: 14, marginBottom: 10, position: 'relative' }}>
+    <div className="card" style={{ padding: 18, marginBottom: 14, position: 'relative' }}>
       <button
         onClick={onRemove}
         style={{ position: 'absolute', top: 10, right: 10, background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 16, lineHeight: 1 }}
@@ -85,19 +114,12 @@ export default function ReactionCard({ reaction, usedTypes, onChange, onRemove }
           <label>URL</label>
           <input
             value={reaction.url}
-            onChange={e => onChange({ ...reaction, url: e.target.value })}
-            placeholder="lurk.png"
+            onChange={e => onChange({ ...reaction, url: convertUrl(e.target.value) })}
+            placeholder="https://example.com/image.png"
           />
+          <AssetValidation value={reaction.url} />
         </div>
-        {reaction.url && (
-          <img
-            src={`/assets/img/${reaction.url}`}
-            alt="preview"
-            style={{ maxHeight: 80, maxWidth: '100%', borderRadius: 4, marginBottom: 12, objectFit: 'contain', background: 'var(--bg)' }}
-            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-            onLoad={e => { (e.target as HTMLImageElement).style.display = 'block'; }}
-          />
-        )}
+        <PreviewBox key={reaction.url} url={reaction.url} assetType="image" />
         <OffsetFields reaction={reaction} onChange={onChange} />
         <TransitionFields reaction={reaction} onChange={onChange} />
         <TimeoutField reaction={reaction} onChange={onChange} />
@@ -105,14 +127,16 @@ export default function ReactionCard({ reaction, usedTypes, onChange, onRemove }
 
       {reaction.type === 'sound' && <>
         <div className="field">
-          <label>FILENAME</label>
+          <label>URL</label>
           <input
             value={reaction.filename}
-            onChange={e => onChange({ ...reaction, filename: e.target.value })}
-            placeholder="sound.mp3"
+            onChange={e => onChange({ ...reaction, filename: convertUrl(e.target.value) })}
+            placeholder="https://example.com/sound.mp3"
           />
+          <AssetValidation value={reaction.filename} />
         </div>
-        <div className="field" style={{ marginBottom: 0 }}>
+        <PreviewBox key={reaction.filename} url={reaction.filename} assetType="sound" />
+        <div className="field" style={{ marginBottom: 12 }}>
           <label>VOLUME (0–1)</label>
           <input
             type="number"
@@ -121,21 +145,102 @@ export default function ReactionCard({ reaction, usedTypes, onChange, onRemove }
             onChange={e => onChange({ ...reaction, volume: parseFloat(e.target.value) })}
           />
         </div>
+        <TrimFields reaction={reaction} onChange={onChange} />
       </>}
 
       {reaction.type === 'video' && <>
         <div className="field">
-          <label>FILENAME</label>
+          <label>URL</label>
           <input
             value={reaction.filename}
-            onChange={e => onChange({ ...reaction, filename: e.target.value })}
-            placeholder="video.mp4"
+            onChange={e => onChange({ ...reaction, filename: convertUrl(e.target.value) })}
+            placeholder="https://example.com/clip.mp4"
           />
+          <AssetValidation value={reaction.filename} />
         </div>
+        <PreviewBox key={reaction.filename} url={reaction.filename} assetType="video" />
         <OffsetFields reaction={reaction} onChange={onChange} />
         <TransitionFields reaction={reaction} onChange={onChange} />
-        <TimeoutField reaction={reaction} onChange={onChange} />
+        <TrimFields reaction={reaction} onChange={onChange} />
       </>}
+    </div>
+  );
+}
+
+function AssetValidation({ value }: { value: string }) {
+  if (!value) return null;
+  const error = validateAsset(value);
+  if (error) return <div className="field-hint" style={{ color: 'var(--red)' }}>{error}</div>;
+  if (isGoogleUrl(value)) {
+    return (
+      <div className="field-hint" style={{ color: '#a970ff' }}>
+        Your Google URL will be converted to a downloadable URL
+      </div>
+    );
+  }
+  if (wasDownloadConverted(value)) {
+    return (
+      <div className="field-hint" style={{ color: '#a970ff' }}>
+        URL updated to dl=1 to support direct downloading
+      </div>
+    );
+  }
+  return null;
+}
+
+type PreviewState = 'idle' | 'loading' | 'done' | 'error';
+
+function PreviewBox({ url, assetType }: { url: string; assetType: 'image' | 'sound' | 'video' }) {
+  const [state, setState] = useState<PreviewState>('idle');
+  const [cachedPath, setCachedPath] = useState('');
+  const [error, setError] = useState('');
+
+  async function handlePreview() {
+    setState('loading');
+    setError('');
+    try {
+      const res = await fetch('/api/asset/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, assetType }),
+      });
+      const data = await res.json() as { path?: string; error?: string };
+      if (!res.ok) {
+        setError(data.error ?? 'Preview failed');
+        setState('error');
+      } else {
+        setCachedPath(data.path ?? '');
+        setState('done');
+      }
+    } catch {
+      setError('Network error');
+      setState('error');
+    }
+  }
+
+  const validUrl = url && !validateAsset(url);
+
+  return (
+    <div style={{ border: '1px solid var(--border)', borderRadius: 4, padding: 8, marginBottom: 12 }}>
+      <button
+        onClick={handlePreview}
+        disabled={!validUrl || state === 'loading'}
+        style={{ fontSize: 12, padding: '3px 10px' }}
+      >
+        {state === 'loading' ? 'Loading…' : 'Preview'}
+      </button>
+      {state === 'error' && (
+        <div className="field-hint" style={{ color: 'var(--red)', marginTop: 6 }}>{error}</div>
+      )}
+      {state === 'done' && assetType === 'image' && (
+        <img src={cachedPath} alt="preview" style={{ maxHeight: 200, maxWidth: '100%', borderRadius: 4, marginTop: 8, objectFit: 'contain', display: 'block' }} />
+      )}
+      {state === 'done' && assetType === 'sound' && (
+        <audio src={cachedPath} controls style={{ width: '100%', marginTop: 8 }} />
+      )}
+      {state === 'done' && assetType === 'video' && (
+        <video src={cachedPath} controls style={{ maxWidth: '100%', maxHeight: 200, marginTop: 8, borderRadius: 4, display: 'block' }} />
+      )}
     </div>
   );
 }
@@ -143,6 +248,7 @@ export default function ReactionCard({ reaction, usedTypes, onChange, onRemove }
 type WithTransitions = { transition_in?: string; transition_out?: string };
 type WithTimeout     = { timeout?: string };
 type WithOffsets     = { offsetX?: number; offsetY?: number; offsetZ?: number };
+type WithTrim        = { startTime?: number; endTime?: number };
 
 function TransitionFields<T extends WithTransitions>({ reaction, onChange }: { reaction: T; onChange: (r: T) => void }) {
   return (
@@ -190,6 +296,34 @@ function OffsetFields<T extends WithOffsets>({ reaction, onChange }: { reaction:
           />
         </div>
       ))}
+    </div>
+  );
+}
+
+function TrimFields<T extends WithTrim>({ reaction, onChange }: { reaction: T; onChange: (r: T) => void }) {
+  const parse = (v: string) => (v === '' ? undefined : Math.max(0, parseFloat(v)));
+  return (
+    <div className="field-row" style={{ marginBottom: 0 }}>
+      <div className="field" style={{ marginBottom: 0 }}>
+        <label>START (s)</label>
+        <input
+          type="number"
+          min={0} step={0.1}
+          value={reaction.startTime ?? ''}
+          onChange={e => onChange({ ...reaction, startTime: parse(e.target.value) })}
+          placeholder="0"
+        />
+      </div>
+      <div className="field" style={{ marginBottom: 0 }}>
+        <label>END (s)</label>
+        <input
+          type="number"
+          min={0} step={0.1}
+          value={reaction.endTime ?? ''}
+          onChange={e => onChange({ ...reaction, endTime: parse(e.target.value) })}
+          placeholder="(end of clip)"
+        />
+      </div>
     </div>
   );
 }

@@ -12,6 +12,7 @@ import sessionStats from './src/SessionStats.js';
 import eventLog from './src/EventLog.js';
 import eventStorage from './src/EventStorage.js';
 import viewerTracker from './src/ViewerTracker.js';
+import assetCacheService from './src/services/AssetCacheService.js';
 import { wss, dashboardWss, app } from './src/server.js';
 
 Logger.info('Starting Twitch project backend...');
@@ -27,6 +28,9 @@ try {
     overlayBroadcasterService = new OverlayBroadcasterService(wss);
     dashboardBroadcasterService = new DashboardBroadcasterService(dashboardWss);
     viewerTracker.setDashboardBroadcaster(dashboardBroadcasterService);
+    assetCacheService.setProgressCallback((current, total, done) => {
+        void overlayBroadcasterService!.broadcast({ type: 'cache_progress', current, total, done });
+    });
 
     if (process.env.TWITCH_ACCESS_TOKEN && process.env.TWITCH_CLIENT_ID) {
         eventRouter = new EventRouter(null, overlayBroadcasterService);
@@ -135,6 +139,8 @@ app.post('/api/events', async (req: Request, res: Response) => {
         res.status(409).json({ error: 'Event already exists' });
         return;
     }
+    assetCacheService.invalidate();
+    void assetCacheService.ensureReady(eventStorage.getAll());
     res.status(201).json({ ok: true });
 });
 
@@ -144,7 +150,27 @@ app.put('/api/events/:name', async (req: Request, res: Response) => {
         res.status(404).json({ error: 'Event not found' });
         return;
     }
+    assetCacheService.invalidate();
+    void assetCacheService.ensureReady(eventStorage.getAll());
     res.json({ ok: true });
+});
+
+app.post('/api/asset/preview', async (req: Request, res: Response) => {
+    const { url, assetType } = req.body as { url?: string; assetType?: string };
+    if (!url || !assetType) {
+        res.status(400).json({ error: 'url and assetType are required' });
+        return;
+    }
+    if (!['image', 'sound', 'video'].includes(assetType)) {
+        res.status(400).json({ error: 'assetType must be image, sound, or video' });
+        return;
+    }
+    try {
+        const path = await assetCacheService.previewUrl(url, assetType as 'image' | 'sound' | 'video');
+        res.json({ path });
+    } catch (error) {
+        res.status(422).json({ error: error instanceof Error ? error.message : String(error) });
+    }
 });
 
 app.delete('/api/events/:name', async (req: Request, res: Response) => {
@@ -175,6 +201,22 @@ app.post('/api/mod/ban/:userId', async (req: Request, res: Response) => {
     if (!twitchClient) { res.status(503).json({ error: 'Twitch client not connected' }); return; }
     const { reason } = req.body as { reason?: string };
     await twitchClient.ban(req.params.userId, reason);
+    res.json({ ok: true });
+});
+
+app.post('/api/overlay-log', (req: Request, res: Response) => {
+    const { level, message } = req.body as { level?: string; message?: string };
+    if (!message) { res.status(400).json({ error: 'message required' }); return; }
+
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const timestamp = `${pad(now.getDate())}-${pad(now.getMonth() + 1)}-${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    const line = `[${timestamp}] [${assetCacheService.getHash()}] [Overlay] ${message}`;
+
+    if (level === 'error') console.error(line);
+    else if (level === 'warn')  console.warn(line);
+    else                        console.log(line);
+
     res.json({ ok: true });
 });
 

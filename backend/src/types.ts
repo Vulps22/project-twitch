@@ -26,6 +26,8 @@ export interface SoundReaction {
     type: 'sound'
     filename: string
     volume?: number
+    startTime?: number
+    endTime?: number
 }
 
 export interface VideoReaction {
@@ -36,7 +38,8 @@ export interface VideoReaction {
     offsetZ?: number
     transition_in?: string
     transition_out?: string
-    timeout?: string
+    startTime?: number
+    endTime?: number
 }
 
 export type OverlayReaction = OverlayTextReaction | ImageReaction | SoundReaction | VideoReaction
@@ -56,11 +59,20 @@ export interface TwitchRawEvent {
     event: Record<string, unknown>
 }
 
-export interface OverlayEvent {
+export interface OverlayReactionEvent {
     type: 'event'
     event_name: string
     reactions: OverlayReaction[]
 }
+
+export interface CacheProgressEvent {
+    type: 'cache_progress'
+    current: number
+    total: number
+    done: boolean
+}
+
+export type OverlayEvent = OverlayReactionEvent | CacheProgressEvent
 
 export interface DashboardChatEvent {
     type: 'chat'

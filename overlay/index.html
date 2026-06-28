@@ -6,6 +6,40 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Twitch Command Overlay</title>
     <style>
+        #cache-indicator {
+            display: none;
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.82);
+            color: #fff;
+            padding: 12px 20px;
+            border-radius: 8px;
+            text-align: center;
+            min-width: 280px;
+            z-index: 9999;
+            font-family: sans-serif;
+            font-size: 13px;
+        }
+        #cache-indicator-bar-track {
+            background: #333;
+            border-radius: 4px;
+            height: 5px;
+            overflow: hidden;
+            margin: 8px 0 6px;
+        }
+        #cache-indicator-bar {
+            background: #9147ff;
+            height: 100%;
+            width: 0%;
+            transition: width 0.25s ease;
+        }
+        #cache-indicator-count {
+            color: #aaa;
+            font-size: 11px;
+        }
+
         body {
             margin: 0;
             padding: 0;
@@ -195,19 +229,44 @@
 
 <body>
     <div id="overlay-container"></div>
+    <div id="cache-indicator">
+        Assets are caching&hellip;
+        <div id="cache-indicator-bar-track">
+            <div id="cache-indicator-bar"></div>
+        </div>
+        <div id="cache-indicator-count"></div>
+    </div>
 
     <script>
+        // Forward console output to the server for remote diagnostics.
+        // Runs immediately so errors during initialisation are captured.
+        (function () {
+            const _orig = { log: console.log, warn: console.warn, error: console.error };
+            ['log', 'warn', 'error'].forEach(level => {
+                console[level] = function (...args) {
+                    _orig[level].apply(console, args);
+                    const message = args.map(a => {
+                        if (a instanceof Error) return a.stack || a.message;
+                        try { return typeof a === 'object' ? JSON.stringify(a) : String(a); }
+                        catch { return String(a); }
+                    }).join(' ');
+                    fetch('/api/overlay-log', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ level, message }),
+                    }).catch(() => {});
+                };
+            });
+        })();
+
         class TwitchOverlay {
 
-            playingMedia = [];
             queuedConfigs = [];
 
             constructor() {
                 this.ws = null;
                 this.overlayContainer = document.getElementById('overlay-container');
-                this.currentDisplay = null;
-                this.displayTimeout = null;
-                this._transitionOut = 'fade-out';
+                this.currentEvent = null;
                 this.reconnectAttempts = 0;
                 this.maxReconnectAttempts = 5;
                 this.reconnectDelay = 1000; // Start with 1 second
@@ -277,6 +336,9 @@
                     case 'event':
                         this.displayEvent(data);
                         break;
+                    case 'cache_progress':
+                        this.updateCacheIndicator(data.current, data.total, data.done);
+                        break;
                     case 'clear':
                         this.clearDisplay();
                         break;
@@ -285,157 +347,193 @@
                 }
             }
 
-            shouldQueue() {
-                return this.currentDisplay !== null || this.playingMedia.length > 0;
+            updateCacheIndicator(current, total, done) {
+                const indicator = document.getElementById('cache-indicator');
+                if (done) {
+                    indicator.style.display = 'none';
+                    return;
+                }
+                indicator.style.display = 'block';
+                const pct = total > 0 ? (current / total) * 100 : 0;
+                document.getElementById('cache-indicator-bar').style.width = pct + '%';
+                document.getElementById('cache-indicator-count').textContent = `${current} / ${total}`;
             }
 
             displayEvent(eventData) {
-                if (this.shouldQueue()) {
+                // One event on screen at a time; later events wait their turn.
+                if (this.currentEvent) {
                     this.queuedConfigs.push(eventData);
                     return;
                 }
 
-                this.clearDisplay();
-
                 const reactions = eventData.reactions || [];
-                const displayElement = document.createElement('div');
-                displayElement.className = 'command-output';
-                let hasVisual = false;
-                let transitionOut = 'fade-out';
-                let timeout = null;
+                const container = document.createElement('div');
+                container.className = 'command-output';
+                this.overlayContainer.appendChild(container);
+
+                const event = { container, pending: 0, instances: [] };
+                this.currentEvent = event;
 
                 for (const reaction of reactions) {
                     switch (reaction.type) {
-                        case 'sound':
-                            this.playSound(reaction.filename, reaction.volume);
-                            break;
-                        case 'image': {
-                            const img = document.createElement('img');
-                            img.className = 'command-image';
-                            img.src = `/assets/img/${reaction.url}`;
-                            img.alt = eventData.event_name || 'Event image';
-                            if (reaction.transition_in) img.classList.add(reaction.transition_in);
-                            img.onerror = () => console.warn(`Image not found: ${reaction.url}`);
-                            displayElement.appendChild(img);
-                            if (reaction.transition_out) transitionOut = reaction.transition_out;
-                            if (reaction.timeout && timeout === null) timeout = this.parseTimeout(reaction.timeout);
-                            hasVisual = true;
-                            break;
-                        }
-                        case 'video': {
-                            const video = document.createElement('video');
-                            video.className = 'command-video';
-                            video.src = `/assets/video/${reaction.filename}`;
-                            video.autoplay = true;
-                            video.muted = true;
-                            video.loop = false;
-                            video.controls = false;
-                            if (reaction.transition_in) video.classList.add(reaction.transition_in);
-                            video.onerror = () => console.warn(`Video not found: ${reaction.filename}`);
-                            video.onloadeddata = () => this.playingMedia.push(video);
-                            video.onended = () => this.onMediaEnded(video, 'video', reaction.filename);
-                            displayElement.appendChild(video);
-                            if (reaction.transition_out) transitionOut = reaction.transition_out;
-                            if (reaction.timeout && timeout === null) timeout = this.parseTimeout(reaction.timeout);
-                            hasVisual = true;
-                            break;
-                        }
-                        case 'overlay_text': {
-                            const textDiv = document.createElement('div');
-                            textDiv.className = 'command-text';
-                            textDiv.textContent = reaction.text;
-                            if (reaction.transition_in) textDiv.classList.add(reaction.transition_in);
-                            displayElement.appendChild(textDiv);
-                            if (reaction.transition_out) transitionOut = reaction.transition_out;
-                            if (reaction.timeout && timeout === null) timeout = this.parseTimeout(reaction.timeout);
-                            hasVisual = true;
-                            break;
-                        }
+                        case 'sound':       this.spawnSound(event, reaction); break;
+                        case 'image':       this.spawnImage(event, reaction); break;
+                        case 'video':       this.spawnVideo(event, reaction); break;
+                        case 'overlay_text': this.spawnText(event, reaction); break;
                     }
                 }
 
-                if (hasVisual) {
-                    this.overlayContainer.appendChild(displayElement);
-                    this.currentDisplay = displayElement;
-                    this._transitionOut = transitionOut;
-                    this.displayTimeout = setTimeout(() => {
-                        this.hideDisplay(this._transitionOut);
-                    }, timeout !== null ? timeout : 5000);
-                }
+                // Nothing renderable (e.g. only a chat reply) — release immediately.
+                if (event.pending === 0) this.finishEvent(event);
             }
 
-            hideDisplay(transitionOut = 'fade-out') {
-                if (this.currentDisplay) {
-                    // Clear any existing classes and add exit transition
-                    this.currentDisplay.className = 'command-output ' + transitionOut;
+            // Each reaction gets an independent lifecycle: its own timers, its own
+            // transition-out, its own removal. The event finishes only once every
+            // reaction has completed, which is what advances the queue.
+            makeInstance(event) {
+                const instance = { el: null, media: null, timers: [], done: false, hiding: false };
+                event.instances.push(instance);
+                event.pending++;
 
-                    // Remove element after transition
-                    setTimeout(() => {
-                        this.clearDisplay();
-                    }, 500); // Match animation duration
-                }
+                instance.finalize = () => {
+                    if (instance.done) return;
+                    instance.done = true;
+                    instance.timers.forEach(clearTimeout);
+                    instance.timers = [];
+                    if (instance.el && instance.el.parentNode) instance.el.remove();
+                    this.reactionComplete(event);
+                };
+
+                instance.hide = (transitionOut) => {
+                    if (instance.done || instance.hiding) return;
+                    instance.hiding = true;
+                    if (instance.el && transitionOut) instance.el.classList.add(transitionOut);
+                    // Let the exit animation play before the element is removed.
+                    instance.timers.push(setTimeout(() => instance.finalize(), 500));
+                };
+
+                return instance;
             }
 
-            clearDisplay() {
-                if (this.displayTimeout) {
-                    clearTimeout(this.displayTimeout);
-                    this.displayTimeout = null;
-                }
-
-                if (this.currentDisplay) {
-                    this.currentDisplay.remove();
-                    this.currentDisplay = null;
-                }
+            spawnImage(event, reaction) {
+                const instance = this.makeInstance(event);
+                const img = document.createElement('img');
+                img.className = 'command-image';
+                img.src = reaction.url;
+                img.alt = 'Event image';
+                if (reaction.transition_in) img.classList.add(reaction.transition_in);
+                img.onerror = () => console.warn(`Image not found: ${reaction.url}`);
+                event.container.appendChild(img);
+                instance.el = img;
+                const timeoutMs = this.parseTimeout(reaction.timeout) ?? 5000;
+                instance.timers.push(setTimeout(() => instance.hide(reaction.transition_out || 'fade-out'), timeoutMs));
             }
 
-            playSound(soundFile, volume) {
+            spawnText(event, reaction) {
+                const instance = this.makeInstance(event);
+                const textDiv = document.createElement('div');
+                textDiv.className = 'command-text';
+                textDiv.textContent = reaction.text;
+                if (reaction.transition_in) textDiv.classList.add(reaction.transition_in);
+                event.container.appendChild(textDiv);
+                instance.el = textDiv;
+                const timeoutMs = this.parseTimeout(reaction.timeout) ?? 5000;
+                instance.timers.push(setTimeout(() => instance.hide(reaction.transition_out || 'fade-out'), timeoutMs));
+            }
+
+            spawnVideo(event, reaction) {
+                const instance = this.makeInstance(event);
+                const transitionOut = reaction.transition_out || 'fade-out';
+                const video = document.createElement('video');
+                video.className = 'command-video';
+                video.src = reaction.filename;
+                video.muted = true;
+                video.loop = false;
+                video.controls = false;
+                if (reaction.transition_in) video.classList.add(reaction.transition_in);
+                video.onerror = () => { console.warn(`Video not found: ${reaction.filename}`); instance.hide(transitionOut); };
+                video.onloadedmetadata = () => {
+                    if (reaction.startTime) video.currentTime = reaction.startTime;
+                    video.play().catch(err => console.warn(`Could not play video: ${reaction.filename}`, err));
+                };
+                video.ontimeupdate = () => {
+                    if (reaction.endTime != null && video.currentTime >= reaction.endTime) {
+                        video.pause();
+                        instance.hide(transitionOut);
+                    }
+                };
+                // No timeout for video: it plays until its natural end or endTime.
+                video.onended = () => instance.hide(transitionOut);
+                event.container.appendChild(video);
+                instance.el = video;
+                instance.media = video;
+            }
+
+            spawnSound(event, reaction) {
+                const instance = this.makeInstance(event);
                 try {
-                    const audio = new Audio(`/assets/audio/${soundFile}`);
-                    audio.volume = volume !== undefined ? volume : 0.5; // Use specified volume or default to 0.5
-
-                    // Track audio in playing media
-                    this.playingMedia.push(audio);
-                    
-                    // Handle audio end
-                    audio.onended = () => {
-                        console.log(`Audio ended: ${soundFile}`);
-                        this.onMediaEnded(audio, 'audio', soundFile);
-                    };
-                    
+                    const audio = new Audio(reaction.filename);
+                    audio.volume = reaction.volume !== undefined ? reaction.volume : 0.5;
+                    instance.media = audio;
+                    if (reaction.startTime) {
+                        audio.onloadedmetadata = () => { audio.currentTime = reaction.startTime; };
+                    }
+                    if (reaction.endTime != null) {
+                        audio.ontimeupdate = () => {
+                            if (audio.currentTime >= reaction.endTime) { audio.pause(); instance.finalize(); }
+                        };
+                    }
+                    audio.onended = () => instance.finalize();
                     audio.play().catch(error => {
-                        console.warn(`Could not play sound: ${soundFile}`, error);
-                        // Remove from playing media if play failed
-                        this.playingMedia = this.playingMedia.filter(media => media !== audio);
+                        console.warn(`Could not play sound: ${reaction.filename}`, error);
+                        instance.finalize();
                     });
                 } catch (error) {
-                    console.warn(`Sound file not found: ${soundFile}`, error);
+                    console.warn(`Sound file not found: ${reaction.filename}`, error);
+                    instance.finalize();
                 }
             }
 
-            onMediaEnded(mediaElement, mediaType, fileName) {
-                console.log(`${mediaType} ended: ${fileName}`);
-                
-                // Remove from playing media array
-                this.playingMedia = this.playingMedia.filter(media => media !== mediaElement);
-                
+            reactionComplete(event) {
+                event.pending--;
+                if (event.pending <= 0) this.finishEvent(event);
+            }
+
+            finishEvent(event) {
+                // Guard against stale callbacks firing after a hard clear.
+                if (this.currentEvent !== event) return;
+                if (event.container && event.container.parentNode) event.container.remove();
+                this.currentEvent = null;
                 if (this.queuedConfigs.length > 0) {
-                    const nextConfig = this.queuedConfigs.shift();
-                    this.displayEvent(nextConfig);
+                    this.displayEvent(this.queuedConfigs.shift());
                 }
+            }
+
+            // Hard reset (server 'clear' message): tear down the active event and
+            // drop anything queued behind it.
+            clearDisplay() {
+                this.queuedConfigs = [];
+                const event = this.currentEvent;
+                if (!event) return;
+                this.currentEvent = null;
+                for (const instance of event.instances) {
+                    instance.timers.forEach(clearTimeout);
+                    if (instance.media) { try { instance.media.pause(); } catch {} }
+                }
+                if (event.container && event.container.parentNode) event.container.remove();
             }
 
             parseTimeout(timeoutStr) {
                 if (!timeoutStr) return null;
 
-                // Parse timeout strings like "5s", "2000ms", "3000"
+                // Parse timeout strings like "5s", "2000ms". A bare number is seconds
+                // (the editor is seconds-based, e.g. "6s") — so "5" means 5s, not 5ms.
                 if (typeof timeoutStr === 'number') return timeoutStr;
                 if (typeof timeoutStr === 'string') {
-                    if (timeoutStr.endsWith('s')) {
-                        return parseFloat(timeoutStr) * 1000;
-                    } else if (timeoutStr.endsWith('ms')) {
+                    if (timeoutStr.endsWith('ms')) {
                         return parseFloat(timeoutStr);
                     } else {
-                        return parseFloat(timeoutStr);
+                        return parseFloat(timeoutStr) * 1000;
                     }
                 }
                 return null;

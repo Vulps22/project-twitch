@@ -1,5 +1,6 @@
 import Logger from '../utils/Logger.js';
 import type { EventConfig, ITwitchClient, IOverlayBroadcaster, OverlayEvent, OverlayReaction, TemplateData } from '../types.js';
+import assetCacheService from '../services/AssetCacheService.js';
 
 export class Handler {
     protected twitchClient: ITwitchClient | null;
@@ -33,6 +34,15 @@ export class Handler {
                     ...reaction,
                     text: this.processTemplate(reaction.text, templateData),
                 });
+            } else if (reaction.type === 'image') {
+                const url = assetCacheService.resolve(reaction.url, 'image');
+                if (url) overlayReactions.push({ ...reaction, url });
+            } else if (reaction.type === 'sound') {
+                const filename = assetCacheService.resolve(reaction.filename, 'sound');
+                if (filename) overlayReactions.push({ ...reaction, filename });
+            } else if (reaction.type === 'video') {
+                const filename = assetCacheService.resolve(reaction.filename, 'video');
+                if (filename) overlayReactions.push({ ...reaction, filename });
             } else {
                 overlayReactions.push(reaction);
             }

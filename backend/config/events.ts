@@ -60,7 +60,7 @@ export const EVENTS: Record<string, EventConfig> = {
         reactions: [
             { type: 'chat_reply', message: 'Thanks {{username}} for the follow!' },
             { type: 'overlay_text', text: '{{username}} is following!', transition_in: 'bounce-in', transition_out: 'bounce-out', timeout: '20s' },
-            { type: 'video', filename: 'follow-dance.mp4', transition_in: 'bounce-in', transition_out: 'bounce-out', timeout: '20s' },
+            { type: 'video', filename: 'follow-dance.mp4', transition_in: 'bounce-in', transition_out: 'bounce-out' },
             { type: 'sound', filename: 'follow.mp3' },
         ],
     },

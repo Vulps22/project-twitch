@@ -195,6 +195,9 @@ Thumbs.db
 # Assets (streamer media files — managed locally, not in version control)
 assets/
 
+# Downloaded asset cache (runtime, rebuilt on connection)
+cache/
+
 # Database files (contain user data)
 backend/data/
 *.db

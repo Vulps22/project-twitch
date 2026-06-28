@@ -113,7 +113,7 @@ export default function EventModal({ event, onSave, onClose }: Props) {
       style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="card" style={{ width: 560, height: '92vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
+      <div className="card" style={{ width: '78vw', height: '92vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
 
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
@@ -123,24 +123,25 @@ export default function EventModal({ event, onSave, onClose }: Props) {
 
         {/* Fixed fields — event name, type, trigger */}
         <div style={{ padding: '20px 20px 0', flexShrink: 0 }}>
-          <div className="field">
-            <label>EVENT NAME</label>
-            <input
-              value={form.event_name}
-              onChange={e => setField('event_name', e.target.value)}
-              placeholder="my_event"
-              disabled={!isCreate}
-              style={!isCreate ? { opacity: 0.5 } : {}}
-            />
-          </div>
-
-          <div className="field">
-            <label>EVENT TYPE</label>
-            <select value={form.event_type} onChange={e => setField('event_type', e.target.value)}>
-              {EVENT_TYPES.map(t => (
-                <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>
-              ))}
-            </select>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>EVENT NAME</label>
+              <input
+                value={form.event_name}
+                onChange={e => setField('event_name', e.target.value)}
+                placeholder="my_event"
+                disabled={!isCreate}
+                style={!isCreate ? { opacity: 0.5 } : {}}
+              />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>EVENT TYPE</label>
+              <select value={form.event_type} onChange={e => setField('event_type', e.target.value)}>
+                {EVENT_TYPES.map(t => (
+                  <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {TRIGGER_REQUIRED.has(form.event_type) && (
