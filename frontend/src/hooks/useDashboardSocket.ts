@@ -10,7 +10,8 @@ export function useDashboardSocket(): ChatFlash | null {
     const [flash, setFlash] = useState<ChatFlash | null>(null);
 
     useEffect(() => {
-        const wsUrl = `ws://${window.location.host}/ws/dashboard`;
+        const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+        const wsUrl = `${protocol}://${window.location.host}/ws/dashboard`;
         const ws = new WebSocket(wsUrl);
 
         ws.onmessage = (e) => {
