@@ -1,0 +1,10 @@
+services:
+  app:
+    build: .
+    env_file: .env
+    ports:
+      - "${PORT}:${PORT}"
+    volumes:
+      - ./assets:/app/assets
+      - ./data:/app/dist/data
+    restart: unless-stopped

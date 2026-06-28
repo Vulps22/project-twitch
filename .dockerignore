@@ -1,0 +1,8 @@
+node_modules
+dist
+.env
+.git
+.vscode
+.claude
+tests
+*.test.ts
